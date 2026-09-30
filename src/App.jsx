@@ -5,6 +5,8 @@ import Dashboard from './pages/Dashboard'
 import POSKasir from './pages/POSKasir'
 import MetodeBayar from './pages/MetodeBayar'
 import CetakPrinter from './pages/CetakPrinter'
+import MasterBarang from './pages/MasterBarang'
+import RiwayatTransaksi from './pages/RiwayatTransaksi'
 import LabaRugi from './pages/LabaRugi'
 import KeuntunganModal from './pages/KeuntunganModal'
 import Settings from './pages/Settings'
@@ -35,8 +37,8 @@ function MainApp() {
       case 'kasir': return <POSKasir />
       case 'metode-bayar': return <MetodeBayar />
       case 'cetak': return <CetakPrinter />
-      case 'barang': return <PlaceholderPage title="Master Barang" desc="Kelola produk & stok" />
-      case 'riwayat': return <PlaceholderPage title="Riwayat Transaksi" desc="Histori semua transaksi" />
+      case 'barang': return <MasterBarang />
+      case 'riwayat': return <RiwayatTransaksi />
       case 'laba-rugi': return <LabaRugi />
       case 'modal': return <KeuntunganModal />
       case 'pengaturan': return <Settings />
@@ -57,21 +59,6 @@ function MainApp() {
         <main className="flex-1 overflow-y-auto">
           {renderPage()}
         </main>
-      </div>
-    </div>
-  )
-}
-
-function PlaceholderPage({ title, desc }) {
-  return (
-    <div className="p-8 flex items-center justify-center min-h-[60vh]">
-      <div className="text-center animate-fade-in">
-        <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span className="text-4xl">🚧</span>
-        </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">{title}</h2>
-        <p className="text-gray-500">{desc}</p>
-        <p className="text-sm text-gray-400 mt-4">Sedang dalam pengembangan</p>
       </div>
     </div>
   )
