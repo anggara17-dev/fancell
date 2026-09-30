@@ -32,8 +32,8 @@ export function AuthProvider({ children }) {
     if (error) throw error
   }
 
-  // Logika Role Sederhana: Jika email owner@fencell.com maka role 'owner', selain itu 'kasir'
-  const role = user?.email === 'owner@fencell.com' ? 'owner' : 'kasir'
+  // Logika Role Sederhana: Jika email owner@fancell.com maka role 'owner', selain itu 'kasir'
+  const role = user?.email === 'owner@fancell.com' ? 'owner' : 'kasir'
 
   const value = { user, role, login, logout }
 
