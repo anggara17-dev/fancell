@@ -5,7 +5,7 @@
 @layer base {
   body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    background-color: #f3f4f6;
+    background-color: #f8fafc;
     color: #1f2937;
     -webkit-font-smoothing: antialiased;
   }
@@ -17,7 +17,7 @@
     scrollbar-color: #cbd5e1 transparent;
   }
   .scrollbar-thin::-webkit-scrollbar {
-    width: 6px;
+    width: 5px;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background-color: #cbd5e1;
@@ -26,39 +26,38 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes slideInLeft {
-  from { opacity: 0; transform: translateX(-20px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes slideInRight {
-  from { opacity: 0; transform: translateX(20px); }
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-10px); }
   to { opacity: 1; transform: translateX(0); }
 }
 
 @keyframes countUp {
-  from { opacity: 0; transform: scale(0.9); }
+  from { opacity: 0; transform: scale(0.95); }
   to { opacity: 1; transform: scale(1); }
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .animate-fade-in {
-  animation: fadeIn 0.5s ease-out forwards;
+  animation: fadeIn 0.4s ease-out forwards;
 }
 
-.animate-slide-left {
-  animation: slideInLeft 0.4s ease-out forwards;
-}
-
-.animate-slide-right {
-  animation: slideInRight 0.4s ease-out forwards;
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out forwards;
 }
 
 .animate-count-up {
-  animation: countUp 0.6s ease-out forwards;
+  animation: countUp 0.5s ease-out forwards;
+}
+
+.animate-spin-slow {
+  animation: spin 1s linear infinite;
 }
 
 .stagger-1 { animation-delay: 0.05s; opacity: 0; }
