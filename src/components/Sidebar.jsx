@@ -15,7 +15,7 @@ export default function Sidebar({ currentPage, setCurrentPage }) {
   return (
     <div className="w-64 bg-white border-r border-gray-200 min-h-screen flex flex-col">
       <div className="p-6 border-b border-gray-200">
-        <h1 className="text-2xl font-bold text-[#0058A3]">Fencell</h1>
+        <h1 className="text-2xl font-bold text-[#0058A3]">Fancell</h1>
         <p className="text-xs text-gray-500 mt-1">Role: {role.toUpperCase()}</p>
       </div>
       
