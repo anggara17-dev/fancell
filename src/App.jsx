@@ -2,6 +2,10 @@ import { useState } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import MetodeBayar from './pages/MetodeBayar'
+import CetakPrinter from './pages/CetakPrinter'
+import LabaRugi from './pages/LabaRugi'
+import KeuntunganModal from './pages/KeuntunganModal'
 import Settings from './pages/Settings'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
@@ -15,11 +19,13 @@ function MainApp() {
   const renderPage = () => {
     switch (currentPage) {
       case 'dashboard': return <Dashboard />
-      case 'kasir': return <PlaceholderPage title="POS / Kasir" desc="Fitur kasir akan segera hadir" />
+      case 'kasir': return <PlaceholderPage title="POS Kasir" desc="Fitur kasir akan segera hadir" />
+      case 'metode-bayar': return <MetodeBayar />
+      case 'cetak': return <CetakPrinter />
       case 'barang': return <PlaceholderPage title="Master Barang" desc="Kelola produk & stok" />
       case 'riwayat': return <PlaceholderPage title="Riwayat Transaksi" desc="Histori semua transaksi" />
-      case 'garansi': return <PlaceholderPage title="Garansi" desc="Klaim & status garansi" />
-      case 'printer': return <PlaceholderPage title="Pengaturan Printer" desc="Konfigurasi printer thermal" />
+      case 'laba-rugi': return <LabaRugi />
+      case 'modal': return <KeuntunganModal />
       case 'pengaturan': return <Settings />
       default: return <Dashboard />
     }
