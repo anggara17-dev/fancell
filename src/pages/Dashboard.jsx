@@ -1,9 +1,17 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { format, subDays, startOfDay, endOfDay, parseISO } from 'date-fns'
+import { format, subDays, startOfDay, endOfDay } from 'date-fns'
 import { id } from 'date-fns/locale'
-import { TrendingUp, Package, ShoppingCart, AlertTriangle, DollarSign, Target, Layers, TrendingDown } from 'lucide-react'
+import {
+  DollarSign,
+  Package,
+  TrendingUp,
+  ShoppingCart,
+  Layers,
+  AlertTriangle,
+  Archive
+} from 'lucide-react'
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -30,7 +38,6 @@ export default function Dashboard() {
       const todayStart = startOfDay(today).toISOString()
       const todayEnd = endOfDay(today).toISOString()
 
-      // 1. Transaksi hari ini dengan item (untuk hitung HPP & Laba Kotor)
       const { data: todayTransactions } = await supabase
         .from('transactions')
         .select(`
@@ -55,12 +62,10 @@ export default function Dashboard() {
       })
       const todayGrossProfit = todaySales - todayHPP
 
-      // 2. Total semua transaksi
       const { count: totalTransactions } = await supabase
         .from('transactions')
         .select('*', { count: 'exact', head: true })
 
-      // 3. Total produk & stok
       const { data: allProducts } = await supabase
         .from('products')
         .select('id, status')
@@ -68,14 +73,12 @@ export default function Dashboard() {
       const totalProducts = allProducts?.length || 0
       const totalStock = allProducts?.filter(p => p.status === 'available').length || 0
 
-      // 4. Stok hampir habis (ambil 10 produk available dengan stok terendah - simulasi)
       const { data: lowStockData } = await supabase
         .from('products')
         .select('name, storage, color, status')
         .eq('status', 'available')
         .limit(10)
 
-      // 5. Grafik 7 hari
       const chartData = []
       for (let i = 6; i >= 0; i--) {
         const date = subDays(today, i)
@@ -118,20 +121,14 @@ export default function Dashboard() {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka || 0)
   }
 
-  const StatCard = ({ icon: Icon, label, value, color, delay, trend }) => (
-    <div className={`bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 animate-fade-in ${delay}`}>
-      <div className="flex items-start justify-between mb-3">
-        <div className={`p-2.5 rounded-lg ${color}`}>
-          <Icon className="w-5 h-5" />
+  const StatCard = ({ icon: Icon, label, value, delay }) => (
+    <div className={`bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 animate-fade-in ${delay}`}>
+      <div className="flex items-start justify-between mb-4">
+        <div className="p-2.5 rounded-lg bg-blue-50">
+          <Icon className="w-5 h-5 text-[#0058A3]" />
         </div>
-        {trend && (
-          <span className={`text-xs font-medium flex items-center gap-1 ${trend > 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {trend > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-            {Math.abs(trend)}%
-          </span>
-        )}
       </div>
-      <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">{label}</p>
+      <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1.5">{label}</p>
       <p className="text-2xl font-bold text-gray-900 animate-count-up">{value}</p>
     </div>
   )
@@ -140,7 +137,7 @@ export default function Dashboard() {
     return (
       <div className="p-8 flex items-center justify-center h-full">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <div className="w-8 h-8 border-4 border-[#0058A3] border-t-transparent rounded-full animate-spin-slow"></div>
           <span className="text-gray-500">Memuat dashboard...</span>
         </div>
       </div>
@@ -149,81 +146,68 @@ export default function Dashboard() {
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
-      {/* Stats Cards - Row 1: Periode Ini */}
+      {/* Row 1: Periode Ini */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           icon={DollarSign}
           label="Penjualan (Periode Ini)"
           value={formatRupiah(stats.todaySales)}
-          color="bg-blue-100 text-blue-600"
           delay="stagger-1"
-          trend={12.5}
         />
         <StatCard
           icon={Package}
           label="HPP (Periode Ini)"
           value={formatRupiah(stats.todayHPP)}
-          color="bg-orange-100 text-orange-600"
           delay="stagger-2"
         />
         <StatCard
           icon={TrendingUp}
           label="Laba Kotor (Periode Ini)"
           value={formatRupiah(stats.todayGrossProfit)}
-          color="bg-green-100 text-green-600"
           delay="stagger-3"
-          trend={8.2}
         />
         <StatCard
           icon={ShoppingCart}
           label="Transaksi (Periode Ini)"
           value={stats.todayTransactions}
-          color="bg-purple-100 text-purple-600"
           delay="stagger-4"
         />
       </div>
 
-      {/* Stats Cards - Row 2: Sepanjang Waktu */}
+      {/* Row 2: Sepanjang Waktu */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           icon={Layers}
           label="Total Transaksi (Sepanjang Waktu)"
           value={stats.totalTransactions}
-          color="bg-indigo-100 text-indigo-600"
           delay="stagger-5"
         />
         <StatCard
-          icon={Package}
+          icon={Archive}
           label="Total Produk"
           value={stats.totalProducts}
-          color="bg-pink-100 text-pink-600"
           delay="stagger-6"
         />
         <StatCard
           icon={Layers}
           label="Total Stok"
           value={stats.totalStock}
-          color="bg-cyan-100 text-cyan-600"
           delay="stagger-7"
         />
         <StatCard
           icon={AlertTriangle}
           label="Stok Hampir Habis"
           value={stats.lowStock}
-          color="bg-red-100 text-red-600"
           delay="stagger-8"
         />
       </div>
 
       {/* Grafik & Produk Hampir Habis */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Grafik Penjualan */}
         <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-gray-200 shadow-sm animate-fade-in stagger-5">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">Grafik Penjualan (7 Hari)</h3>
-              <p className="text-sm text-gray-500 mt-0.5">Performa penjualan minggu ini</p>
-            </div>
+          <div className="mb-6">
+            <h3 className="text-lg font-bold text-gray-900">Grafik Penjualan (7 Hari)</h3>
+            <p className="text-sm text-gray-500 mt-0.5">Performa penjualan minggu ini</p>
           </div>
           {salesChart.every(d => d.penjualan === 0) ? (
             <div className="h-[320px] flex flex-col items-center justify-center text-gray-400">
@@ -245,21 +229,16 @@ export default function Dashboard() {
                     color: 'white'
                   }}
                 />
-                <Bar dataKey="penjualan" radius={[8, 8, 0, 0]} maxBarSize={50}>
-                  {salesChart.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill="#0a0a0a" />
-                  ))}
-                </Bar>
+                <Bar dataKey="penjualan" fill="#0058A3" radius={[6, 6, 0, 0]} maxBarSize={50} />
               </BarChart>
             </ResponsiveContainer>
           )}
         </div>
 
-        {/* Produk Hampir Habis */}
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm animate-fade-in stagger-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-gray-900">Produk Hampir Habis</h3>
-            <AlertTriangle className="w-5 h-5 text-red-500" />
+            <AlertTriangle className="w-5 h-5 text-[#0058A3]" />
           </div>
           {lowStockProducts.length === 0 ? (
             <div className="h-[320px] flex flex-col items-center justify-center text-gray-400">
@@ -271,18 +250,16 @@ export default function Dashboard() {
               {lowStockProducts.map((product, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center justify-between py-3 px-2 hover:bg-gray-50 rounded-lg transition-colors group"
+                  className="flex items-center justify-between py-3 px-2 hover:bg-gray-50 rounded-lg transition-colors"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-600 transition-colors">
-                      {product.name}
-                    </p>
+                    <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
                     <p className="text-xs text-gray-500">
                       {product.color && `${product.color}`}
                       {product.storage && ` · ${product.storage}`}
                     </p>
                   </div>
-                  <span className="text-sm font-bold text-red-600 bg-red-50 px-2.5 py-1 rounded-md ml-2">
+                  <span className="text-sm font-bold text-[#0058A3] bg-blue-50 px-2.5 py-1 rounded-md ml-2">
                     0 pcs
                   </span>
                 </div>
@@ -292,7 +269,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Footer */}
       <div className="text-center text-xs text-gray-400 pt-4 pb-2">
         Design & Develop By <span className="font-semibold text-gray-600">Fancell Team</span>
       </div>
