@@ -1,35 +1,34 @@
-import { useEffect, useState } from 'react'
-import { supabase } from './lib/supabaseClient'
+import { useState } from 'react'
+import { AuthProvider, useAuth } from './context/AuthContext'
+import Login from './pages/Login'
+import Dashboard from './pages/Dashboard'
+import Sidebar from './components/Sidebar'
 
-function App() {
-  const [status, setStatus] = useState('Mengecek koneksi...')
+function MainApp() {
+  const { user } = useAuth()
+  const [currentPage, setCurrentPage] = useState('dashboard')
 
-  useEffect(() => {
-    // Tes koneksi ke Supabase
-    const testConnection = async () => {
-      const { data, error } = await supabase.from('products').select('count', { count: 'exact', head: true })
-      
-      if (error) {
-        setStatus('❌ Gagal konek ke Supabase: ' + error.message)
-      } else {
-        setStatus('✅ Berhasil konek ke Supabase! Database siap digunakan.')
-      }
-    }
-    testConnection()
-  }, [])
+  if (!user) return <Login />
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white">
-      <div className="text-center p-8 border border-blue-200 rounded-xl shadow-lg max-w-md w-full">
-        <h1 className="text-3xl font-bold text-[#0058A3] mb-4">Toko HP POS</h1>
-        <p className="text-lg text-gray-700 mb-2">Status Sistem:</p>
-        <div className={`p-4 rounded-lg font-semibold ${status.includes('Berhasil') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-          {status}
-        </div>
-        <p className="text-sm text-gray-400 mt-6">Fencell POS System v1.0</p>
-      </div>
+    <div className="flex min-h-screen bg-gray-50">
+      <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} />
+      <main className="flex-1 overflow-y-auto">
+        {currentPage === 'dashboard' && <Dashboard />}
+        {currentPage === 'kasir' && <div className="p-8 text-gray-500">Halaman Kasir (Segera Hadir)</div>}
+        {currentPage === 'barang' && <div className="p-8 text-gray-500">Halaman Barang (Segera Hadir)</div>}
+        {currentPage === 'riwayat' && <div className="p-8 text-gray-500">Halaman Riwayat (Segera Hadir)</div>}
+        {currentPage === 'laba-rugi' && <div className="p-8 text-gray-500">Halaman Laba Rugi (Segera Hadir)</div>}
+        {currentPage === 'modal' && <div className="p-8 text-gray-500">Halaman Modal (Segera Hadir)</div>}
+      </main>
     </div>
   )
 }
 
-export default App
+export default function App() {
+  return (
+    <AuthProvider>
+      <MainApp />
+    </AuthProvider>
+  )
+}
