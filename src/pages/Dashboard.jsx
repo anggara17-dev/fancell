@@ -270,7 +270,7 @@ export default function Dashboard() {
       </div>
 
       <div className="text-center text-xs text-gray-400 pt-4 pb-2">
-        Design & Develop By <span className="font-semibold text-gray-600">Fancell Team</span>
+        Design & Develop By <span className="font-semibold text-gray-600">Depgo</span>
       </div>
     </div>
   )
