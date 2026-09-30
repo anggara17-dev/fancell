@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import { Wallet, TrendingUp, TrendingDown, Plus, Minus } from 'lucide-react'
-import { format } from 'date-fns'
-import { id } from 'date-fns/locale'
+import { Wallet, TrendingUp, TrendingDown } from 'lucide-react'
 
 export default function KeuntunganModal() {
   const [data, setData] = useState({
@@ -26,7 +24,6 @@ export default function KeuntunganModal() {
         .select('type, amount')
 
       let modalAwal = 0
-      let modalTambahan = 0
       let prive = 0
 
       capitalTx?.forEach(tx => {
@@ -37,11 +34,11 @@ export default function KeuntunganModal() {
         }
       })
 
-      const totalModal = modalAwal + modalTambahan
-      const keuntungan = 0 // Nanti dari laba rugi
+      const totalModal = modalAwal
+      const keuntungan = 0
       const saldoModal = totalModal + keuntungan - prive
 
-      setData({ modalAwal, modalTambahan, totalModal, keuntungan, prive, saldoModal })
+      setData({ modalAwal, modalTambahan: 0, totalModal, keuntungan, prive, saldoModal })
     } catch (error) {
       console.error('Error loading data:', error)
     } finally {
@@ -68,7 +65,6 @@ export default function KeuntunganModal() {
         <p className="text-sm text-gray-500 mt-0.5">Tracking modal usaha dan keuntungan</p>
       </div>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
           <div className="flex items-center gap-3 mb-3">
@@ -101,14 +97,12 @@ export default function KeuntunganModal() {
         </div>
       </div>
 
-      {/* Saldo Modal */}
       <div className="bg-gradient-to-br from-[#0058A3] to-[#004080] p-8 rounded-xl shadow-lg text-white mb-6">
         <p className="text-sm opacity-90 mb-2">Saldo Modal Berjalan</p>
         <p className="text-4xl font-bold">{formatRupiah(data.saldoModal)}</p>
         <p className="text-sm opacity-75 mt-2">Modal + Keuntungan - Prive</p>
       </div>
 
-      {/* Info */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <h4 className="text-sm font-semibold text-[#0058A3] mb-2">Cara Kerja</h4>
         <ul className="text-sm text-gray-700 space-y-1">
