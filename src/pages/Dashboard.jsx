@@ -1,277 +1,211 @@
-import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { format, subDays, startOfDay, endOfDay } from 'date-fns'
-import { id } from 'date-fns/locale'
+import { useState, useRef, useEffect } from 'react'
+import { useAuth } from '../context/AuthContext'
 import {
-  DollarSign,
-  Package,
-  TrendingUp,
+  LayoutDashboard,
   ShoppingCart,
-  Layers,
-  AlertTriangle,
-  Archive
+  Package,
+  History,
+  FileText,
+  Wallet,
+  Settings,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  LogOut,
+  Zap,
+  CreditCard,
+  Printer
 } from 'lucide-react'
 
-export default function Dashboard() {
-  const [stats, setStats] = useState({
-    todaySales: 0,
-    todayHPP: 0,
-    todayGrossProfit: 0,
-    todayTransactions: 0,
-    totalTransactions: 0,
-    totalProducts: 0,
-    totalStock: 0,
-    lowStock: 0
-  })
-  const [salesChart, setSalesChart] = useState([])
-  const [lowStockProducts, setLowStockProducts] = useState([])
-  const [loading, setLoading] = useState(true)
+export default function Sidebar({ currentPage, setCurrentPage }) {
+  const { user, role, logout } = useAuth()
+  const [collapsed, setCollapsed] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [kasirMenuOpen, setKasirMenuOpen] = useState(true)
+  const userMenuRef = useRef(null)
 
   useEffect(() => {
-    loadDashboardData()
+    function handleClickOutside(event) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setUserMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  async function loadDashboardData() {
-    try {
-      const today = new Date()
-      const todayStart = startOfDay(today).toISOString()
-      const todayEnd = endOfDay(today).toISOString()
+  const menuStructure = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['owner', 'kasir'] },
+    { 
+      id: 'kasir-group', 
+      label: 'Kasir / POS', 
+      icon: ShoppingCart, 
+      roles: ['owner', 'kasir'],
+      children: [
+        { id: 'kasir', label: 'POS Kasir', icon: ShoppingCart },
+        { id: 'metode-bayar', label: 'Metode Bayar', icon: CreditCard },
+        { id: 'cetak', label: 'Cetak / Printer', icon: Printer },
+      ]
+    },
+    { id: 'barang', label: 'Master Barang', icon: Package, roles: ['owner', 'kasir', 'gudang'] },
+    { id: 'riwayat', label: 'Riwayat Transaksi', icon: History, roles: ['owner', 'kasir'] },
+    { id: 'laba-rugi', label: 'Laba Rugi', icon: FileText, roles: ['owner'] },
+    { id: 'modal', label: 'Keuntungan & Modal', icon: Wallet, roles: ['owner'] },
+    { id: 'pengaturan', label: 'Pengaturan', icon: Settings, roles: ['owner'] },
+  ]
 
-      const { data: todayTransactions } = await supabase
-        .from('transactions')
-        .select(`
-          id,
-          total_amount,
-          transaction_items (
-            hpp_at_sale,
-            price_at_sale,
-            qty
-          )
-        `)
-        .gte('created_at', todayStart)
-        .lte('created_at', todayEnd)
-
-      let todaySales = 0
-      let todayHPP = 0
-      todayTransactions?.forEach(tx => {
-        todaySales += Number(tx.total_amount) || 0
-        tx.transaction_items?.forEach(item => {
-          todayHPP += (Number(item.hpp_at_sale) || 0) * (item.qty || 1)
-        })
-      })
-      const todayGrossProfit = todaySales - todayHPP
-
-      const { count: totalTransactions } = await supabase
-        .from('transactions')
-        .select('*', { count: 'exact', head: true })
-
-      const { data: allProducts } = await supabase
-        .from('products')
-        .select('id, status')
-
-      const totalProducts = allProducts?.length || 0
-      const totalStock = allProducts?.filter(p => p.status === 'available').length || 0
-
-      const { data: lowStockData } = await supabase
-        .from('products')
-        .select('name, storage, color, status')
-        .eq('status', 'available')
-        .limit(10)
-
-      const chartData = []
-      for (let i = 6; i >= 0; i--) {
-        const date = subDays(today, i)
-        const dayStart = startOfDay(date).toISOString()
-        const dayEnd = endOfDay(date).toISOString()
-
-        const { data: dayTx } = await supabase
-          .from('transactions')
-          .select('total_amount')
-          .gte('created_at', dayStart)
-          .lte('created_at', dayEnd)
-
-        const daySales = dayTx?.reduce((sum, t) => sum + Number(t.total_amount), 0) || 0
-        chartData.push({
-          date: format(date, 'dd MMM', { locale: id }),
-          penjualan: daySales
-        })
-      }
-
-      setStats({
-        todaySales,
-        todayHPP,
-        todayGrossProfit,
-        todayTransactions: todayTransactions?.length || 0,
-        totalTransactions: totalTransactions || 0,
-        totalProducts,
-        totalStock,
-        lowStock: lowStockData?.length || 0
-      })
-      setSalesChart(chartData)
-      setLowStockProducts(lowStockData || [])
-    } catch (error) {
-      console.error('Error loading dashboard:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const formatRupiah = (angka) => {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka || 0)
-  }
-
-  const StatCard = ({ icon: Icon, label, value, delay }) => (
-    <div className={`bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 animate-fade-in ${delay}`}>
-      <div className="flex items-start justify-between mb-4">
-        <div className="p-2.5 rounded-lg bg-blue-50">
-          <Icon className="w-5 h-5 text-[#0058A3]" />
-        </div>
-      </div>
-      <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1.5">{label}</p>
-      <p className="text-2xl font-bold text-gray-900 animate-count-up">{value}</p>
-    </div>
-  )
-
-  if (loading) {
-    return (
-      <div className="p-8 flex items-center justify-center h-full">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 border-4 border-[#0058A3] border-t-transparent rounded-full animate-spin-slow"></div>
-          <span className="text-gray-500">Memuat dashboard...</span>
-        </div>
-      </div>
-    )
-  }
+  const filteredMenu = menuStructure.filter(item => item.roles.includes(role))
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
-      {/* Row 1: Periode Ini */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          icon={DollarSign}
-          label="Penjualan (Periode Ini)"
-          value={formatRupiah(stats.todaySales)}
-          delay="stagger-1"
-        />
-        <StatCard
-          icon={Package}
-          label="HPP (Periode Ini)"
-          value={formatRupiah(stats.todayHPP)}
-          delay="stagger-2"
-        />
-        <StatCard
-          icon={TrendingUp}
-          label="Laba Kotor (Periode Ini)"
-          value={formatRupiah(stats.todayGrossProfit)}
-          delay="stagger-3"
-        />
-        <StatCard
-          icon={ShoppingCart}
-          label="Transaksi (Periode Ini)"
-          value={stats.todayTransactions}
-          delay="stagger-4"
-        />
-      </div>
-
-      {/* Row 2: Sepanjang Waktu */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          icon={Layers}
-          label="Total Transaksi (Sepanjang Waktu)"
-          value={stats.totalTransactions}
-          delay="stagger-5"
-        />
-        <StatCard
-          icon={Archive}
-          label="Total Produk"
-          value={stats.totalProducts}
-          delay="stagger-6"
-        />
-        <StatCard
-          icon={Layers}
-          label="Total Stok"
-          value={stats.totalStock}
-          delay="stagger-7"
-        />
-        <StatCard
-          icon={AlertTriangle}
-          label="Stok Hampir Habis"
-          value={stats.lowStock}
-          delay="stagger-8"
-        />
-      </div>
-
-      {/* Grafik & Produk Hampir Habis */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-gray-200 shadow-sm animate-fade-in stagger-5">
-          <div className="mb-6">
-            <h3 className="text-lg font-bold text-gray-900">Grafik Penjualan (7 Hari)</h3>
-            <p className="text-sm text-gray-500 mt-0.5">Performa penjualan minggu ini</p>
-          </div>
-          {salesChart.every(d => d.penjualan === 0) ? (
-            <div className="h-[320px] flex flex-col items-center justify-center text-gray-400">
-              <ShoppingCart className="w-12 h-12 mb-2 opacity-30" />
-              <p className="text-sm">Belum ada data penjualan</p>
+    <aside
+      className={`${
+        collapsed ? 'w-20' : 'w-64'
+      } bg-white border-r border-gray-200 min-h-screen flex flex-col transition-all duration-300 ease-in-out relative shadow-sm`}
+    >
+      {/* Logo */}
+      <div className="p-5 flex items-center justify-between border-b border-gray-200">
+        {!collapsed ? (
+          <div className="flex items-center gap-3 animate-slide-in overflow-hidden">
+            <div className="w-10 h-10 bg-[#0058A3] rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
+              <Zap className="w-6 h-6 text-white" />
             </div>
-          ) : (
-            <ResponsiveContainer width="100%" height={320}>
-              <BarChart data={salesChart} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                <XAxis dataKey="date" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `${(v/1000000).toFixed(0)}jt`} />
-                <Tooltip
-                  formatter={(value) => formatRupiah(value)}
-                  contentStyle={{
-                    backgroundColor: '#1f2937',
-                    border: 'none',
-                    borderRadius: '8px',
-                    color: 'white'
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold tracking-wider text-gray-900">FANCELL</h1>
+              <p className="text-[10px] text-gray-500 -mt-0.5">POS & Bookkeeping</p>
+            </div>
+          </div>
+        ) : (
+          <div className="w-10 h-10 bg-[#0058A3] rounded-xl flex items-center justify-center mx-auto shadow-md">
+            <Zap className="w-6 h-6 text-white" />
+          </div>
+        )}
+      </div>
+
+      {/* Toggle Button */}
+      <button
+        onClick={() => setCollapsed(!collapsed)}
+        className="absolute -right-3 top-20 w-6 h-6 bg-[#0058A3] hover:bg-[#004080] text-white rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 shadow-lg z-20"
+        title={collapsed ? 'Buka sidebar' : 'Tutup sidebar'}
+      >
+        {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
+      </button>
+
+      {/* Menu */}
+      <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto scrollbar-thin">
+        {filteredMenu.map((item) => {
+          const Icon = item.icon
+          
+          // Menu dengan submenu (Kasir/POS)
+          if (item.children) {
+            const isGroupActive = item.children.some(child => child.id === currentPage)
+            return (
+              <div key={item.id}>
+                <button
+                  onClick={() => {
+                    if (collapsed) {
+                      setCurrentPage(item.children[0].id)
+                    } else {
+                      setKasirMenuOpen(!kasirMenuOpen)
+                    }
                   }}
-                />
-                <Bar dataKey="penjualan" fill="#0058A3" radius={[6, 6, 0, 0]} maxBarSize={50} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm animate-fade-in stagger-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-gray-900">Produk Hampir Habis</h3>
-            <AlertTriangle className="w-5 h-5 text-[#0058A3]" />
-          </div>
-          {lowStockProducts.length === 0 ? (
-            <div className="h-[320px] flex flex-col items-center justify-center text-gray-400">
-              <Package className="w-12 h-12 mb-2 opacity-30" />
-              <p className="text-sm">Semua stok aman</p>
-            </div>
-          ) : (
-            <div className="space-y-1 max-h-[320px] overflow-y-auto scrollbar-thin">
-              {lowStockProducts.map((product, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between py-3 px-2 hover:bg-gray-50 rounded-lg transition-colors"
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group relative ${
+                    isGroupActive
+                      ? 'bg-blue-50 text-[#0058A3]'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-[#0058A3]'
+                  }`}
+                  title={collapsed ? item.label : ''}
                 >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
-                    <p className="text-xs text-gray-500">
-                      {product.color && `${product.color}`}
-                      {product.storage && ` · ${product.storage}`}
-                    </p>
+                  <Icon className="w-5 h-5 flex-shrink-0" />
+                  {!collapsed && (
+                    <>
+                      <span className="truncate flex-1 text-left">{item.label}</span>
+                      <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${kasirMenuOpen ? 'rotate-180' : ''}`} />
+                    </>
+                  )}
+                </button>
+
+                {!collapsed && kasirMenuOpen && (
+                  <div className="ml-4 mt-1 space-y-1 border-l-2 border-gray-200 pl-3 animate-fade-in">
+                    {item.children.map((child) => {
+                      const ChildIcon = child.icon
+                      const isActive = currentPage === child.id
+                      return (
+                        <button
+                          key={child.id}
+                          onClick={() => setCurrentPage(child.id)}
+                          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
+                            isActive
+                              ? 'bg-[#0058A3] text-white font-medium shadow-sm'
+                              : 'text-gray-600 hover:bg-gray-100 hover:text-[#0058A3]'
+                          }`}
+                        >
+                          <ChildIcon className="w-4 h-4 flex-shrink-0" />
+                          <span className="truncate">{child.label}</span>
+                        </button>
+                      )
+                    })}
                   </div>
-                  <span className="text-sm font-bold text-[#0058A3] bg-blue-50 px-2.5 py-1 rounded-md ml-2">
-                    0 pcs
-                  </span>
-                </div>
-              ))}
+                )}
+              </div>
+            )
+          }
+
+          // Menu biasa
+          const isActive = currentPage === item.id
+          return (
+            <button
+              key={item.id}
+              onClick={() => setCurrentPage(item.id)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group relative ${
+                isActive
+                  ? 'bg-[#0058A3] text-white shadow-md'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-[#0058A3]'
+              }`}
+              title={collapsed ? item.label : ''}
+            >
+              <Icon className="w-5 h-5 flex-shrink-0" />
+              {!collapsed && <span className="truncate">{item.label}</span>}
+            </button>
+          )
+        })}
+      </nav>
+
+      {/* User Dropdown */}
+      <div className="p-3 border-t border-gray-200 relative" ref={userMenuRef}>
+        <button
+          onClick={() => setUserMenuOpen(!userMenuOpen)}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100 transition-colors"
+        >
+          <div className="w-9 h-9 bg-gradient-to-br from-[#0058A3] to-[#004080] rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0 shadow-md">
+            {user?.email?.charAt(0).toUpperCase()}
+          </div>
+          {!collapsed && (
+            <div className="flex-1 min-w-0 text-left">
+              <p className="text-sm font-semibold text-gray-900 truncate">{user?.email?.split('@')[0]}</p>
+              <p className="text-xs text-gray-500 capitalize">{role}</p>
             </div>
           )}
-        </div>
-      </div>
+        </button>
 
-      <div className="text-center text-xs text-gray-400 pt-4 pb-2">
-        Design & Develop By <span className="font-semibold text-gray-600">Fancell Team</span>
+        {userMenuOpen && !collapsed && (
+          <div className="absolute bottom-full left-3 right-3 mb-2 bg-white border border-gray-200 rounded-lg shadow-xl py-1 animate-fade-in z-40">
+            <div className="px-3 py-2 border-b border-gray-100">
+              <p className="text-xs text-gray-500">Login sebagai</p>
+              <p className="text-sm font-medium text-gray-900 truncate">{user?.email}</p>
+            </div>
+            <button
+              onClick={() => {
+                setUserMenuOpen(false)
+                logout()
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Keluar</span>
+            </button>
+          </div>
+        )}
       </div>
-    </div>
+    </aside>
   )
 }
