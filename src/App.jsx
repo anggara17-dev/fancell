@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import Settings from './pages/Settings'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 
@@ -16,13 +17,10 @@ function MainApp() {
       case 'dashboard': return <Dashboard />
       case 'kasir': return <PlaceholderPage title="POS / Kasir" desc="Fitur kasir akan segera hadir" />
       case 'barang': return <PlaceholderPage title="Master Barang" desc="Kelola produk & stok" />
-      case 'stok': return <PlaceholderPage title="Stok & Opname" desc="Opname stok berkala" />
       case 'riwayat': return <PlaceholderPage title="Riwayat Transaksi" desc="Histori semua transaksi" />
       case 'garansi': return <PlaceholderPage title="Garansi" desc="Klaim & status garansi" />
-      case 'konsinyasi': return <PlaceholderPage title="Konsinyasi" desc="Barang titipan penitip" />
       case 'printer': return <PlaceholderPage title="Pengaturan Printer" desc="Konfigurasi printer thermal" />
-      case 'user': return <PlaceholderPage title="Manajemen User" desc="Kelola akun kasir & staff" />
-      case 'pengaturan': return <PlaceholderPage title="Pengaturan" desc="Konfigurasi sistem" />
+      case 'pengaturan': return <Settings />
       default: return <Dashboard />
     }
   }
@@ -44,7 +42,7 @@ function PlaceholderPage({ title, desc }) {
   return (
     <div className="p-8 flex items-center justify-center min-h-[60vh]">
       <div className="text-center animate-fade-in">
-        <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
           <span className="text-4xl">🚧</span>
         </div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">{title}</h2>
