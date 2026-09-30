@@ -34,9 +34,19 @@ export default function Sidebar({ currentPage, setCurrentPage }) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Menu utama
-  const mainMenuItems = [
+  const menuStructure = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['owner', 'kasir'] },
+    { 
+      id: 'kasir-group', 
+      label: 'Kasir / POS', 
+      icon: ShoppingCart, 
+      roles: ['owner', 'kasir'],
+      children: [
+        { id: 'kasir', label: 'POS Kasir', icon: ShoppingCart },
+        { id: 'metode-bayar', label: 'Metode Bayar', icon: CreditCard },
+        { id: 'cetak', label: 'Cetak / Printer', icon: Printer },
+      ]
+    },
     { id: 'barang', label: 'Master Barang', icon: Package, roles: ['owner', 'kasir', 'gudang'] },
     { id: 'riwayat', label: 'Riwayat Transaksi', icon: History, roles: ['owner', 'kasir'] },
     { id: 'laba-rugi', label: 'Laba Rugi', icon: FileText, roles: ['owner'] },
@@ -44,14 +54,7 @@ export default function Sidebar({ currentPage, setCurrentPage }) {
     { id: 'pengaturan', label: 'Pengaturan', icon: Settings, roles: ['owner'] },
   ]
 
-  // Submenu Kasir/POS
-  const kasirSubItems = [
-    { id: 'kasir', label: 'POS Kasir', icon: ShoppingCart },
-    { id: 'metode-bayar', label: 'Metode Bayar', icon: CreditCard },
-    { id: 'cetak', label: 'Cetak / Printer', icon: Printer },
-  ]
-
-  const filteredMainMenu = mainMenuItems.filter(item => item.roles.includes(role))
+  const filteredMenu = menuStructure.filter(item => item.roles.includes(role))
 
   return (
     <aside
@@ -89,74 +92,65 @@ export default function Sidebar({ currentPage, setCurrentPage }) {
 
       {/* Menu */}
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto scrollbar-thin">
-        {/* Dashboard */}
-        <button
-          onClick={() => setCurrentPage('dashboard')}
-          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group relative ${
-            currentPage === 'dashboard'
-              ? 'bg-[#0058A3] text-white shadow-md'
-              : 'text-gray-600 hover:bg-gray-100 hover:text-[#0058A3]'
-          }`}
-          title={collapsed ? 'Dashboard' : ''}
-        >
-          <LayoutDashboard className="w-5 h-5 flex-shrink-0" />
-          {!collapsed && <span className="truncate">Dashboard</span>}
-        </button>
-
-        {/* Kasir / POS dengan Submenu */}
-        <div>
-          <button
-            onClick={() => {
-              if (collapsed) {
-                setCurrentPage('kasir')
-              } else {
-                setKasirMenuOpen(!kasirMenuOpen)
-              }
-            }}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group relative ${
-              ['kasir', 'metode-bayar', 'cetak'].includes(currentPage)
-                ? 'bg-blue-50 text-[#0058A3]'
-                : 'text-gray-600 hover:bg-gray-100 hover:text-[#0058A3]'
-            }`}
-            title={collapsed ? 'Kasir / POS' : ''}
-          >
-            <ShoppingCart className="w-5 h-5 flex-shrink-0" />
-            {!collapsed && (
-              <>
-                <span className="truncate flex-1 text-left">Kasir / POS</span>
-                <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${kasirMenuOpen ? 'rotate-180' : ''}`} />
-              </>
-            )}
-          </button>
-
-          {/* Submenu Items */}
-          {!collapsed && kasirMenuOpen && (
-            <div className="ml-4 mt-1 space-y-1 border-l-2 border-gray-200 pl-3 animate-fade-in">
-              {kasirSubItems.map((item) => {
-                const Icon = item.icon
-                const isActive = currentPage === item.id
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setCurrentPage(item.id)}
-                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
-                      isActive
-                        ? 'bg-[#0058A3] text-white font-medium shadow-sm'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-[#0058A3]'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4 flex-shrink-0" />
-                    <span className="truncate">{item.label}</span>
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Menu Lainnya */}
-        {filteredMainMenu.map((item) => {
+        {filteredMenu.map((item) => {
           const Icon = item.icon
+          
+          // Menu dengan submenu (Kasir/POS)
+          if (item.children) {
+            const isGroupActive = item.children.some(child => child.id === currentPage)
+            return (
+              <div key={item.id}>
+                <button
+                  onClick={() => {
+                    if (collapsed) {
+                      setCurrentPage(item.children[0].id)
+                    } else {
+                      setKasirMenuOpen(!kasirMenuOpen)
+                    }
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group relative ${
+                    isGroupActive
+                      ? 'bg-blue-50 text-[#0058A3]'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-[#0058A3]'
+                  }`}
+                  title={collapsed ? item.label : ''}
+                >
+                  <Icon className="w-5 h-5 flex-shrink-0" />
+                  {!collapsed && (
+                    <>
+                      <span className="truncate flex-1 text-left">{item.label}</span>
+                      <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${kasirMenuOpen ? 'rotate-180' : ''}`} />
+                    </>
+                  )}
+                </button>
+
+                {!collapsed && kasirMenuOpen && (
+                  <div className="ml-4 mt-1 space-y-1 border-l-2 border-gray-200 pl-3 animate-fade-in">
+                    {item.children.map((child) => {
+                      const ChildIcon = child.icon
+                      const isActive = currentPage === child.id
+                      return (
+                        <button
+                          key={child.id}
+                          onClick={() => setCurrentPage(child.id)}
+                          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
+                            isActive
+                              ? 'bg-[#0058A3] text-white font-medium shadow-sm'
+                              : 'text-gray-600 hover:bg-gray-100 hover:text-[#0058A3]'
+                          }`}
+                        >
+                          <ChildIcon className="w-4 h-4 flex-shrink-0" />
+                          <span className="truncate">{child.label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          }
+
+          // Menu biasa
           const isActive = currentPage === item.id
           return (
             <button
