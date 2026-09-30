@@ -1,4 +1,0 @@
-window.__ENV__={
-  SUPABASE_URL:"https://saqpqbjbfequfahlpsse.supabase.co",
-  SUPABASE_ANON_KEY:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNhcXBxYmpiZmVxdWZhaGxwc3NlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4OTkwMDY4OSwiZXhwIjoyMTA1NDc2Njg5fQ.nJBuWrd2mZz_XBr0Hcng41jUbz1WbvWLJUeuTON_kuU"
-};
