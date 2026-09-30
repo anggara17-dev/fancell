@@ -49,10 +49,7 @@ export default function LabaRugi() {
       })
 
       const labaKotor = pendapatan - hpp
-
-      // Biaya operasional (placeholder, nanti bisa dari tabel operational_costs)
       const biayaOperasional = 0
-
       const labaBersih = labaKotor - biayaOperasional
 
       setData({ pendapatan, hpp, labaKotor, biayaOperasional, labaBersih })
@@ -80,7 +77,9 @@ export default function LabaRugi() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Laba Rugi</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Laporan keuntungan periode {format(new Date(period.from), 'dd MMM yyyy', { locale: id })} - {format(new Date(period.to), 'dd MMM yyyy', { locale: id })}</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Periode {format(new Date(period.from), 'dd MMM yyyy', { locale: id })} - {format(new Date(period.to), 'dd MMM yyyy', { locale: id })}
+          </p>
         </div>
         <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-1 border border-gray-200">
           <input
@@ -99,7 +98,6 @@ export default function LabaRugi() {
         </div>
       </div>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
           <div className="flex items-center gap-3 mb-3">
@@ -144,7 +142,6 @@ export default function LabaRugi() {
         </div>
       </div>
 
-      {/* Detail Table */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-gray-200">
           <h3 className="text-lg font-bold text-gray-900">Detail Perhitungan</h3>
