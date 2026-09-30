@@ -25,7 +25,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full bg-white p-8 rounded-xl shadow-md border border-gray-200">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-[#0058A3]">Fencell POS</h1>
+          <h1 className="text-3xl font-bold text-[#0058A3]">Fancell POS</h1>
           <p className="text-gray-500 mt-2">Silakan login untuk melanjutkan</p>
         </div>
 
@@ -44,7 +44,7 @@ export default function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0058A3] focus:border-transparent outline-none"
-              placeholder="owner@fencell.com"
+              placeholder="owner@fancell.com"
             />
           </div>
           <div>
