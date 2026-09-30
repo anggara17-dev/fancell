@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import { Users, Plus, Edit2, Trash2, Shield, X, Check } from 'lucide-react'
+import { Users, Plus, Edit2, Trash2, X, Check, Shield } from 'lucide-react'
 
 export default function Settings() {
   const [users, setUsers] = useState([])
@@ -40,7 +40,6 @@ export default function Settings() {
 
     try {
       if (editingUser) {
-        // Update user
         const { error } = await supabase
           .from('users')
           .update({
@@ -53,7 +52,6 @@ export default function Settings() {
         if (error) throw error
         setMessage({ type: 'success', text: 'User berhasil diupdate' })
       } else {
-        // Create user via Supabase Auth
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
@@ -64,7 +62,6 @@ export default function Settings() {
         
         if (authError) throw authError
         
-        // Insert ke tabel users
         const { error: dbError } = await supabase
           .from('users')
           .insert({
@@ -103,17 +100,6 @@ export default function Settings() {
     } catch (err) {
       setMessage({ type: 'error', text: err.message })
     }
-  }
-
-  function handleEdit(user) {
-    setEditingUser(user)
-    setFormData({
-      username: user.username,
-      email: user.email,
-      password: '',
-      role: user.role
-    })
-    setShowForm(true)
   }
 
   const roleBadge = (role) => {
@@ -165,7 +151,6 @@ export default function Settings() {
         </div>
       )}
 
-      {/* Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
@@ -228,11 +213,6 @@ export default function Settings() {
                   <option value="kasir">Kasir (Transaksi & Stok)</option>
                   <option value="gudang">Gudang (Master Barang Saja)</option>
                 </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  {formData.role === 'owner' && 'Akses semua modul termasuk Laba Rugi & Pengaturan'}
-                  {formData.role === 'kasir' && 'Akses POS, Riwayat, Master Barang (tidak bisa lihat Laba Rugi)'}
-                  {formData.role === 'gudang' && 'Hanya bisa kelola Master Barang & Stok'}
-                </p>
               </div>
               <div className="flex gap-3 pt-2">
                 <button
@@ -255,7 +235,6 @@ export default function Settings() {
         </div>
       )}
 
-      {/* Table User */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -289,7 +268,16 @@ export default function Settings() {
                   <td className="py-3 px-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button
-                        onClick={() => handleEdit(user)}
+                        onClick={() => {
+                          setEditingUser(user)
+                          setFormData({
+                            username: user.username,
+                            email: user.email,
+                            password: '',
+                            role: user.role
+                          })
+                          setShowForm(true)
+                        }}
                         className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors text-[#0058A3]"
                         title="Edit"
                       >
