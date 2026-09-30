@@ -95,19 +95,8 @@ export default function MetodeBayar() {
     }
   }
 
-  const typeBadge = (type) => {
-    const colors = {
-      cash: 'bg-green-100 text-green-700',
-      bank_transfer: 'bg-blue-100 text-blue-700',
-      qris: 'bg-purple-100 text-purple-700',
-      ewallet: 'bg-orange-100 text-orange-700',
-      credit_card: 'bg-red-100 text-red-700'
-    }
-    return (
-      <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors[type] || 'bg-gray-100 text-gray-700'}`}>
-        {type.replace('_', ' ').toUpperCase()}
-      </span>
-    )
+  const formatRupiah = (angka) => {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka || 0)
   }
 
   if (loading) {
@@ -146,7 +135,6 @@ export default function MetodeBayar() {
         </div>
       )}
 
-      {/* Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
@@ -241,7 +229,6 @@ export default function MetodeBayar() {
         </div>
       )}
 
-      {/* Table */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -266,9 +253,13 @@ export default function MetodeBayar() {
                       <span className="text-sm font-medium text-gray-900">{method.name}</span>
                     </div>
                   </td>
-                  <td className="py-3 px-4">{typeBadge(method.type)}</td>
+                  <td className="py-3 px-4">
+                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                      {method.type.replace('_', ' ').toUpperCase()}
+                    </span>
+                  </td>
                   <td className="py-3 px-4 text-sm text-gray-600">{method.admin_fee_percentage}%</td>
-                  <td className="py-3 px-4 text-sm text-gray-600">Rp {method.admin_fee_fixed.toLocaleString()}</td>
+                  <td className="py-3 px-4 text-sm text-gray-600">{formatRupiah(method.admin_fee_fixed)}</td>
                   <td className="py-3 px-4">
                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${method.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                       {method.is_active ? 'Aktif' : 'Nonaktif'}
