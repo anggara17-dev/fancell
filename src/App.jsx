@@ -1,30 +1,35 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider, useAuth } from './context/AuthContext'
-import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
-import Kasir from './pages/Kasir'
-import MasterBarang from './pages/MasterBarang'
-import LabaRugi from './pages/LabaRugi'
+import { useEffect, useState } from 'react'
+import { supabase } from './lib/supabaseClient'
 
-function ProtectedRoute({ children, allowedRoles }) {
-  const { user, role } = useAuth()
-  if (!user) return <Navigate to="/login" />
-  if (allowedRoles && !allowedRoles.includes(role)) return <Navigate to="/" />
-  return children
-}
+function App() {
+  const [status, setStatus] = useState('Mengecek koneksi...')
 
-export default function App() {
+  useEffect(() => {
+    // Tes koneksi ke Supabase
+    const testConnection = async () => {
+      const { data, error } = await supabase.from('products').select('count', { count: 'exact', head: true })
+      
+      if (error) {
+        setStatus('❌ Gagal konek ke Supabase: ' + error.message)
+      } else {
+        setStatus('✅ Berhasil konek ke Supabase! Database siap digunakan.')
+      }
+    }
+    testConnection()
+  }, [])
+
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/kasir" element={<ProtectedRoute><Kasir /></ProtectedRoute>} />
-          <Route path="/barang" element={<ProtectedRoute><MasterBarang /></ProtectedRoute>} />
-          <Route path="/laba-rugi" element={<ProtectedRoute allowedRoles={['owner']}><LabaRugi /></ProtectedRoute>} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="text-center p-8 border border-blue-200 rounded-xl shadow-lg max-w-md w-full">
+        <h1 className="text-3xl font-bold text-[#0058A3] mb-4">Toko HP POS</h1>
+        <p className="text-lg text-gray-700 mb-2">Status Sistem:</p>
+        <div className={`p-4 rounded-lg font-semibold ${status.includes('Berhasil') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+          {status}
+        </div>
+        <p className="text-sm text-gray-400 mt-6">Fencell POS System v1.0</p>
+      </div>
+    </div>
   )
 }
+
+export default App
