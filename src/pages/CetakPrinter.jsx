@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import { Printer, Check, X } from 'lucide-react'
+import { Printer } from 'lucide-react'
 
 export default function CetakPrinter() {
   const [printerStatus, setPrinterStatus] = useState('idle')
-  const [selectedPrinter, setSelectedPrinter] = useState(null)
 
   const handleTestPrint = () => {
     setPrinterStatus('printing')
@@ -21,7 +20,6 @@ export default function CetakPrinter() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Status Printer */}
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
           <h3 className="text-lg font-bold text-gray-900 mb-4">Status Printer</h3>
           <div className="space-y-4">
@@ -44,7 +42,6 @@ export default function CetakPrinter() {
           </div>
         </div>
 
-        {/* Pengaturan Printer */}
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
           <h3 className="text-lg font-bold text-gray-900 mb-4">Pengaturan</h3>
           <div className="space-y-4">
@@ -74,7 +71,6 @@ export default function CetakPrinter() {
         </div>
       </div>
 
-      {/* Info */}
       <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
         <h4 className="text-sm font-semibold text-[#0058A3] mb-2">Informasi Printer</h4>
         <ul className="text-sm text-gray-700 space-y-1">
