@@ -41,7 +41,7 @@ export default function Dashboard() {
         .select('*', { count: 'exact', head: true })
         .eq('status', 'available')
 
-      // 3. Penjualan via Paylater/Kredit hari ini (Home Credit, Kredivo, SPayLater, dll)
+      // 3. Penjualan via Paylater/Kredit hari ini
       const { data: paylaterTx } = await supabase
         .from('transactions')
         .select(`
@@ -216,3 +216,4 @@ export default function Dashboard() {
       </div>
     </div>
   )
+}
