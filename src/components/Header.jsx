@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Calendar, Menu } from 'lucide-react'
+import { Calendar, Bell } from 'lucide-react'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 
-export default function Header({ user, role, onToggleSidebar }) {
+export default function Header({ user, role }) {
   const [greeting, setGreeting] = useState('')
   const [dateFrom, setDateFrom] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'))
@@ -24,19 +24,11 @@ export default function Header({ user, role, onToggleSidebar }) {
 
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-      <div className="flex items-center gap-4">
-        <button
-          onClick={onToggleSidebar}
-          className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {greeting}, <span className="font-semibold text-blue-600">{user?.email?.split('@')[0]}</span>!
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <p className="text-sm text-gray-500 mt-0.5">
+          {greeting}, <span className="font-semibold text-[#0058A3]">{user?.email?.split('@')[0]}</span>!
+        </p>
       </div>
 
       <div className="flex items-center gap-3">
@@ -68,15 +60,10 @@ export default function Header({ user, role, onToggleSidebar }) {
           </button>
         </div>
 
-        <div className="flex items-center gap-3 pl-3 border-l border-gray-200">
-          <div className="text-right">
-            <p className="text-sm font-semibold text-gray-900">{user?.email?.split('@')[0]}</p>
-            <p className="text-xs text-gray-500 capitalize">{role}</p>
-          </div>
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center font-bold text-white shadow-lg">
-            {user?.email?.charAt(0).toUpperCase()}
-          </div>
-        </div>
+        <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors relative">
+          <Bell className="w-5 h-5 text-gray-600" />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#0058A3] rounded-full"></span>
+        </button>
       </div>
     </header>
   )
