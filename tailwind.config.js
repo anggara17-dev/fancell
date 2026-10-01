@@ -3,11 +3,10 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: '#0058A3', // Biru IKEA
-        'primary-dark': '#004080'
+        primary: '#0058A3'
       },
       fontFamily: {
-        sans: ['Inter', 'Noto Sans', 'sans-serif']
+        sans: ['Inter', 'system-ui', 'sans-serif']
       }
     }
   },
