@@ -40,10 +40,6 @@
   to { opacity: 1; transform: scale(1); }
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
 .animate-fade-in {
   animation: fadeIn 0.4s ease-out forwards;
 }
@@ -58,6 +54,10 @@
 
 .animate-spin-slow {
   animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .stagger-1 { animation-delay: 0.05s; opacity: 0; }
