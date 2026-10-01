@@ -171,7 +171,7 @@ export default function Sidebar({ currentPage, setCurrentPage }) {
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100 transition-colors"
         >
           <div className="w-9 h-9 bg-gradient-to-br from-[#0058A3] to-[#004080] rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0 shadow-md">
-            {user?.email?.charAt(0).toUpperCase()}
+            {user?.username?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase()}
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0 text-left">
