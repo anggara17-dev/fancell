@@ -175,7 +175,7 @@ export default function Sidebar({ currentPage, setCurrentPage }) {
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0 text-left">
-              <p className="text-sm font-semibold text-gray-900 truncate">{user?.email?.split('@')[0]}</p>
+              <p className="text-sm font-semibold text-gray-900 truncate">{user?.username || user?.email?.split('@')[0]}</p>
               <p className="text-xs text-gray-500 capitalize">{role}</p>
             </div>
           )}
