@@ -8,7 +8,6 @@ export const useAuth = () => useContext(AuthContext)
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [role, setRole] = useState('kasir')
-  const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -17,7 +16,6 @@ export function AuthProvider({ children }) {
       if (session?.user) {
         const userRole = session.user.email === 'owner@fancell.com' ? 'owner' : 'kasir'
         setRole(userRole)
-        loadUsers()
       }
       setLoading(false)
     })
@@ -27,30 +25,13 @@ export function AuthProvider({ children }) {
       if (session?.user) {
         const userRole = session.user.email === 'owner@fancell.com' ? 'owner' : 'kasir'
         setRole(userRole)
-        loadUsers()
       } else {
         setRole('kasir')
-        setUsers([])
       }
     })
 
     return () => subscription.unsubscribe()
   }, [])
-
-  async function loadUsers() {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, username, email, role')
-        .order('username')
-      
-      if (!error && data) {
-        setUsers(data)
-      }
-    } catch (err) {
-      console.error('Error loading users:', err)
-    }
-  }
 
   const login = async (email, password) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
@@ -62,7 +43,7 @@ export function AuthProvider({ children }) {
     if (error) throw error
   }
 
-  const value = { user, role, users, login, logout, loadUsers }
+  const value = { user, role, login, logout }
 
   return (
     <AuthContext.Provider value={value}>
