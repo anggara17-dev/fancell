@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { Zap, Eye, EyeOff } from 'lucide-react'
 
 export default function Login() {
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
@@ -15,9 +15,9 @@ export default function Login() {
     setError('')
     setLoading(true)
     try {
-      await login(email, password)
+      await login(username, password)
     } catch (err) {
-      setError('Email atau password salah')
+      setError(err.message || 'Login gagal')
     }
     setLoading(false)
   }
@@ -42,14 +42,15 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Username</label>
               <input
-                type="email"
+                type="text"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0058A3] focus:border-transparent outline-none transition-all"
-                placeholder="admin@fancell.com"
+                placeholder="Masukkan username"
+                autoComplete="username"
               />
             </div>
             <div>
@@ -62,6 +63,7 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0058A3] focus:border-transparent outline-none transition-all pr-11"
                   placeholder="••••••••"
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
@@ -87,7 +89,13 @@ export default function Login() {
             </button>
           </form>
 
-          <p className="text-center text-xs text-gray-400 mt-6">
+          <div className="mt-6 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-xs text-[#0058A3] font-semibold mb-1">Default Login:</p>
+            <p className="text-xs text-gray-600">Owner: <span className="font-mono">owner</span> / <span className="font-mono">admin123</span></p>
+            <p className="text-xs text-gray-600">Kasir: <span className="font-mono">kasir</span> / <span className="font-mono">kasir123</span></p>
+          </div>
+
+          <p className="text-center text-xs text-gray-400 mt-4">
             Fancell POS System v1.0
           </p>
         </div>
