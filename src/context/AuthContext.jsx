@@ -7,38 +7,53 @@ export const useAuth = () => useContext(AuthContext)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
-  const [role, setRole] = useState('owner')
+  const [role, setRole] = useState('kasir')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user || null)
-      if (session?.user) {
-        setRole('owner')
+    // Cek session dari localStorage
+    const savedUser = localStorage.getItem('fancell_user')
+    if (savedUser) {
+      try {
+        const parsed = JSON.parse(savedUser)
+        setUser(parsed)
+        setRole(parsed.role)
+      } catch (e) {
+        localStorage.removeItem('fancell_user')
       }
-      setLoading(false)
-    })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null)
-      if (session?.user) {
-        setRole('owner')
-      } else {
-        setRole('owner')
-      }
-    })
-
-    return () => subscription.unsubscribe()
+    }
+    setLoading(false)
   }, [])
 
-  const login = async (email, password) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) throw error
+  const login = async (username, password) => {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('username', username)
+      .eq('password', password)
+      .eq('is_active', true)
+      .single()
+
+    if (error || !data) {
+      throw new Error('Username atau password salah')
+    }
+
+    const userData = {
+      id: data.id,
+      username: data.username,
+      email: data.email,
+      role: data.role
+    }
+
+    setUser(userData)
+    setRole(data.role)
+    localStorage.setItem('fancell_user', JSON.stringify(userData))
   }
 
-  const logout = async () => {
-    const { error } = await supabase.auth.signOut()
-    if (error) throw error
+  const logout = () => {
+    setUser(null)
+    setRole('kasir')
+    localStorage.removeItem('fancell_user')
   }
 
   const value = { user, role, login, logout }
