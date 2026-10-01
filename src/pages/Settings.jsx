@@ -23,7 +23,7 @@ export default function Settings() {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('*')
+        .select('id, username, email, role, is_active')
         .order('username')
       
       if (!error) setUsers(data || [])
@@ -40,39 +40,39 @@ export default function Settings() {
 
     try {
       if (editingUser) {
+        const updateData = {
+          username: formData.username,
+          email: formData.email,
+          role: formData.role
+        }
+        if (formData.password) {
+          updateData.password = formData.password
+        }
+
         const { error } = await supabase
           .from('users')
-          .update({
-            username: formData.username,
-            email: formData.email,
-            role: formData.role
-          })
+          .update(updateData)
           .eq('id', editingUser.id)
         
         if (error) throw error
         setMessage({ type: 'success', text: 'User berhasil diupdate' })
       } else {
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: formData.email,
-          password: formData.password,
-          options: {
-            data: { username: formData.username, role: formData.role }
-          }
-        })
-        
-        if (authError) throw authError
-        
-        const { error: dbError } = await supabase
+        if (!formData.password) {
+          setMessage({ type: 'error', text: 'Password wajib diisi untuk user baru' })
+          return
+        }
+
+        const { error } = await supabase
           .from('users')
           .insert({
-            id: authData.user.id,
             username: formData.username,
             email: formData.email,
             role: formData.role,
-            password_hash: 'hashed_by_supabase'
+            password: formData.password,
+            is_active: true
           })
         
-        if (dbError) throw dbError
+        if (error) throw error
         setMessage({ type: 'success', text: 'User berhasil ditambahkan' })
       }
       
@@ -167,7 +167,7 @@ export default function Settings() {
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Username</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Username *</label>
                 <input
                   type="text"
                   required
@@ -178,32 +178,31 @@ export default function Settings() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Email (Opsional)</label>
                 <input
                   type="email"
-                  required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0058A3] focus:border-transparent outline-none"
                   placeholder="email@fancell.com"
                 />
               </div>
-              {!editingUser && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
-                  <input
-                    type="password"
-                    required
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0058A3] focus:border-transparent outline-none"
-                    placeholder="Minimal 6 karakter"
-                    minLength={6}
-                  />
-                </div>
-              )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Role / Hak Akses</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Password {editingUser ? '(Kosongkan jika tidak ingin mengubah)' : '*'}
+                </label>
+                <input
+                  type="password"
+                  required={!editingUser}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0058A3] focus:border-transparent outline-none"
+                  placeholder="Minimal 6 karakter"
+                  minLength={6}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Role / Hak Akses *</label>
                 <select
                   value={formData.role}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value })}
@@ -213,6 +212,11 @@ export default function Settings() {
                   <option value="kasir">Kasir (Transaksi & Stok)</option>
                   <option value="gudang">Gudang (Master Barang Saja)</option>
                 </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  {formData.role === 'owner' && 'Akses semua modul termasuk Laba Rugi & Pengaturan'}
+                  {formData.role === 'kasir' && 'Akses POS, Riwayat, Master Barang (tidak bisa lihat Laba Rugi)'}
+                  {formData.role === 'gudang' && 'Hanya bisa kelola Master Barang & Stok'}
+                </p>
               </div>
               <div className="flex gap-3 pt-2">
                 <button
@@ -258,7 +262,7 @@ export default function Settings() {
                       <span className="text-sm font-medium text-gray-900">{user.username}</span>
                     </div>
                   </td>
-                  <td className="py-3 px-4 text-sm text-gray-600">{user.email}</td>
+                  <td className="py-3 px-4 text-sm text-gray-600">{user.email || '-'}</td>
                   <td className="py-3 px-4">{roleBadge(user.role)}</td>
                   <td className="py-3 px-4 text-xs text-gray-500">
                     {user.role === 'owner' && 'Semua modul'}
@@ -272,7 +276,7 @@ export default function Settings() {
                           setEditingUser(user)
                           setFormData({
                             username: user.username,
-                            email: user.email,
+                            email: user.email || '',
                             password: '',
                             role: user.role
                           })
