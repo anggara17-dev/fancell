@@ -28,7 +28,7 @@ export default function Header({ user, role, title, showDateFilter = false }) {
         <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
         {showDateFilter && (
           <p className="text-sm text-gray-500 mt-0.5">
-            {greeting}, <span className="font-semibold text-[#0058A3]">{user?.email?.split('@')[0]}</span>!
+            {greeting}, <span className="font-semibold text-[#0058A3]">{user?.username || user?.email?.split('@')[0]}</span>!
           </p>
         )}
       </div>
