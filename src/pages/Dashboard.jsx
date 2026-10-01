@@ -146,63 +146,20 @@ export default function Dashboard() {
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
-      {/* Row 1: Periode Ini */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          icon={DollarSign}
-          label="Penjualan (Periode Ini)"
-          value={formatRupiah(stats.todaySales)}
-          delay="stagger-1"
-        />
-        <StatCard
-          icon={Package}
-          label="HPP (Periode Ini)"
-          value={formatRupiah(stats.todayHPP)}
-          delay="stagger-2"
-        />
-        <StatCard
-          icon={TrendingUp}
-          label="Laba Kotor (Periode Ini)"
-          value={formatRupiah(stats.todayGrossProfit)}
-          delay="stagger-3"
-        />
-        <StatCard
-          icon={ShoppingCart}
-          label="Transaksi (Periode Ini)"
-          value={stats.todayTransactions}
-          delay="stagger-4"
-        />
+        <StatCard icon={DollarSign} label="Penjualan (Periode Ini)" value={formatRupiah(stats.todaySales)} delay="stagger-1" />
+        <StatCard icon={Package} label="HPP (Periode Ini)" value={formatRupiah(stats.todayHPP)} delay="stagger-2" />
+        <StatCard icon={TrendingUp} label="Laba Kotor (Periode Ini)" value={formatRupiah(stats.todayGrossProfit)} delay="stagger-3" />
+        <StatCard icon={ShoppingCart} label="Transaksi (Periode Ini)" value={stats.todayTransactions} delay="stagger-4" />
       </div>
 
-      {/* Row 2: Sepanjang Waktu */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          icon={Layers}
-          label="Total Transaksi (Sepanjang Waktu)"
-          value={stats.totalTransactions}
-          delay="stagger-5"
-        />
-        <StatCard
-          icon={Archive}
-          label="Total Produk"
-          value={stats.totalProducts}
-          delay="stagger-6"
-        />
-        <StatCard
-          icon={Layers}
-          label="Total Stok"
-          value={stats.totalStock}
-          delay="stagger-7"
-        />
-        <StatCard
-          icon={AlertTriangle}
-          label="Stok Hampir Habis"
-          value={stats.lowStock}
-          delay="stagger-8"
-        />
+        <StatCard icon={Layers} label="Total Transaksi (Sepanjang Waktu)" value={stats.totalTransactions} delay="stagger-5" />
+        <StatCard icon={Archive} label="Total Produk" value={stats.totalProducts} delay="stagger-6" />
+        <StatCard icon={Layers} label="Total Stok" value={stats.totalStock} delay="stagger-7" />
+        <StatCard icon={AlertTriangle} label="Stok Hampir Habis" value={stats.lowStock} delay="stagger-8" />
       </div>
 
-      {/* Grafik & Produk Hampir Habis */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-gray-200 shadow-sm animate-fade-in stagger-5">
           <div className="mb-6">
@@ -248,10 +205,7 @@ export default function Dashboard() {
           ) : (
             <div className="space-y-1 max-h-[320px] overflow-y-auto scrollbar-thin">
               {lowStockProducts.map((product, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between py-3 px-2 hover:bg-gray-50 rounded-lg transition-colors"
-                >
+                <div key={idx} className="flex items-center justify-between py-3 px-2 hover:bg-gray-50 rounded-lg transition-colors">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
                     <p className="text-xs text-gray-500">
@@ -270,7 +224,7 @@ export default function Dashboard() {
       </div>
 
       <div className="text-center text-xs text-gray-400 pt-4 pb-2">
-        Design & Develop By <span className="font-semibold text-gray-600">Depgo</span>
+        Design & Develop By <span className="font-semibold text-gray-600">Fancell Team</span>
       </div>
     </div>
   )
