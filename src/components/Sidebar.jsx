@@ -62,7 +62,6 @@ export default function Sidebar({ currentPage, setCurrentPage }) {
         collapsed ? 'w-20' : 'w-64'
       } bg-white border-r border-gray-200 min-h-screen flex flex-col transition-all duration-300 ease-in-out relative shadow-sm`}
     >
-      {/* Logo */}
       <div className="p-5 flex items-center justify-between border-b border-gray-200">
         {!collapsed ? (
           <div className="flex items-center gap-3 animate-slide-in overflow-hidden">
@@ -81,7 +80,6 @@ export default function Sidebar({ currentPage, setCurrentPage }) {
         )}
       </div>
 
-      {/* Toggle Button */}
       <button
         onClick={() => setCollapsed(!collapsed)}
         className="absolute -right-3 top-20 w-6 h-6 bg-[#0058A3] hover:bg-[#004080] text-white rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 shadow-lg z-20"
@@ -90,12 +88,10 @@ export default function Sidebar({ currentPage, setCurrentPage }) {
         {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
       </button>
 
-      {/* Menu */}
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto scrollbar-thin">
         {filteredMenu.map((item) => {
           const Icon = item.icon
           
-          // Menu dengan submenu (Kasir/POS)
           if (item.children) {
             const isGroupActive = item.children.some(child => child.id === currentPage)
             return (
@@ -150,7 +146,6 @@ export default function Sidebar({ currentPage, setCurrentPage }) {
             )
           }
 
-          // Menu biasa
           const isActive = currentPage === item.id
           return (
             <button
@@ -170,7 +165,6 @@ export default function Sidebar({ currentPage, setCurrentPage }) {
         })}
       </nav>
 
-      {/* User Dropdown */}
       <div className="p-3 border-t border-gray-200 relative" ref={userMenuRef}>
         <button
           onClick={() => setUserMenuOpen(!userMenuOpen)}
