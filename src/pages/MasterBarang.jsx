@@ -1,469 +1,52 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { Plus, Edit2, Trash2, X, Check, Package, Search } from 'lucide-react'
-
+const rp = n => new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(n||0)
+const empty = { name:'', category:'hp', type:'new', brand:'', model:'', storage:'', color:'', imei:'', hpp:0, harga_jual:0, status:'available', stock_qty:0, image_url:'' }
 export default function MasterBarang() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [q, setQ] = useState('')
   const [showForm, setShowForm] = useState(false)
-  const [editingProduct, setEditingProduct] = useState(null)
-  const [message, setMessage] = useState({ type: '', text: '' })
-  const [formData, setFormData] = useState({
-    name: '',
-    category: 'hp',
-    type: 'new',
-    brand: '',
-    model: '',
-    storage: '',
-    color: '',
-    imei: '',
-    hpp: 0,
-    harga_jual: 0,
-    status: 'available'
-  })
-
-  useEffect(() => {
-    loadProducts()
-  }, [])
-
-  async function loadProducts() {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false })
-      
-      if (error) {
-        console.error('Error loading products:', error)
-        setMessage({ type: 'error', text: 'Error: ' + error.message })
-      } else {
-        setProducts(data || [])
-      }
-    } catch (err) {
-      console.error(err)
-      setMessage({ type: 'error', text: 'Error: ' + err.message })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const filteredProducts = products.filter(p => 
-    p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.imei?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.brand?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
-  async function handleSubmit(e) {
-    e.preventDefault()
-    setMessage({ type: '', text: '' })
-
-    try {
-      if (editingProduct) {
-        const { error } = await supabase
-          .from('products')
-          .update({
-            name: formData.name,
-            category: formData.category,
-            type: formData.type,
-            brand: formData.brand,
-            model: formData.model,
-            storage: formData.storage,
-            color: formData.color,
-            imei: formData.imei || null,
-            hpp: formData.hpp,
-            harga_jual: formData.harga_jual,
-            status: formData.status
-          })
-          .eq('id', editingProduct.id)
-        
-        if (error) throw error
-        setMessage({ type: 'success', text: 'Produk berhasil diupdate' })
-      } else {
-        const { error } = await supabase
-          .from('products')
-          .insert({
-            name: formData.name,
-            category: formData.category,
-            type: formData.type,
-            brand: formData.brand,
-            model: formData.model,
-            storage: formData.storage,
-            color: formData.color,
-            imei: formData.imei || null,
-            hpp: formData.hpp,
-            harga_jual: formData.harga_jual,
-            status: formData.status
-          })
-        
-        if (error) throw error
-        setMessage({ type: 'success', text: 'Produk berhasil ditambahkan' })
-      }
-      
-      setShowForm(false)
-      setEditingProduct(null)
-      setFormData({
-        name: '',
-        category: 'hp',
-        type: 'new',
-        brand: '',
-        model: '',
-        storage: '',
-        color: '',
-        imei: '',
-        hpp: 0,
-        harga_jual: 0,
-        status: 'available'
-      })
-      loadProducts()
-      
-      setTimeout(() => setMessage({ type: '', text: '' }), 3000)
-    } catch (err) {
-      setMessage({ type: 'error', text: err.message })
-    }
-  }
-
-  async function deleteProduct(id) {
-    if (!confirm('Yakin ingin menghapus produk ini?')) return
-    
-    try {
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', id)
-      
-      if (error) throw error
-      setMessage({ type: 'success', text: 'Produk berhasil dihapus' })
-      loadProducts()
-      
-      setTimeout(() => setMessage({ type: '', text: '' }), 3000)
-    } catch (err) {
-      setMessage({ type: 'error', text: err.message })
-    }
-  }
-
-  function handleEdit(product) {
-    setEditingProduct(product)
-    setFormData({
-      name: product.name || '',
-      category: product.category || 'hp',
-      type: product.type || 'new',
-      brand: product.brand || '',
-      model: product.model || '',
-      storage: product.storage || '',
-      color: product.color || '',
-      imei: product.imei || '',
-      hpp: product.hpp || 0,
-      harga_jual: product.harga_jual || 0,
-      status: product.status || 'available'
-    })
-    setShowForm(true)
-  }
-
-  function handleAdd() {
-    setEditingProduct(null)
-    setFormData({
-      name: '',
-      category: 'hp',
-      type: 'new',
-      brand: '',
-      model: '',
-      storage: '',
-      color: '',
-      imei: '',
-      hpp: 0,
-      harga_jual: 0,
-      status: 'available'
-    })
-    setShowForm(true)
-  }
-
-  const formatRupiah = (angka) => {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka || 0)
-  }
-
-  if (loading) {
-    return (
-      <div className="p-8 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-[#0058A3] border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    )
-  }
-
+  const [editing, setEditing] = useState(null)
+  const [fd, setFd] = useState(empty)
+  const [msg, setMsg] = useState({type:'',text:''})
+  useEffect(()=>{ load() },[])
+  async function load(){ const {data,error}=await supabase.from('products').select('*').order('created_at',{ascending:false}); if(error) setMsg({type:'error',text:error.message}); setProducts(data||[]); setLoading(false) }
+  const filtered = products.filter(p=>!q||p.name?.toLowerCase().includes(q.toLowerCase())||p.imei?.toLowerCase().includes(q.toLowerCase())||p.brand?.toLowerCase().includes(q.toLowerCase()))
+  async function submit(e){ e.preventDefault(); setMsg({type:'',text:''}); try { const payload={ name:fd.name, category:fd.category, type:fd.type, brand:fd.brand, model:fd.model, storage:fd.storage, color:fd.color, imei:fd.imei||null, hpp:Number(fd.hpp)||0, harga_jual:Number(fd.harga_jual)||0, status:fd.status, stock_qty:fd.category==='hp'?1:(Number(fd.stock_qty)||0), image_url:fd.image_url||null }; if(editing){ const {error}=await supabase.from('products').update(payload).eq('id',editing.id); if(error) throw error; setMsg({type:'success',text:'Produk diupdate'}) } else { const {error}=await supabase.from('products').insert(payload); if(error) throw error; setMsg({type:'success',text:'Produk ditambahkan'}) } setShowForm(false); setEditing(null); setFd(empty); load(); setTimeout(()=>setMsg({type:'',text:''}),3000) } catch(err){ setMsg({type:'error',text:err.message}) } }
+  async function del(id){ if(!confirm('Hapus produk ini?'))return; const {error}=await supabase.from('products').delete().eq('id',id); if(error) setMsg({type:'error',text:error.message}); else setMsg({type:'success',text:'Produk dihapus'}); load(); setTimeout(()=>setMsg({type:'',text:''}),3000) }
+  function edit(p){ setEditing(p); setFd({ name:p.name||'', category:p.category||'hp', type:p.type||'new', brand:p.brand||'', model:p.model||'', storage:p.storage||'', color:p.color||'', imei:p.imei||'', hpp:p.hpp||0, harga_jual:p.harga_jual||0, status:p.status||'available', stock_qty:p.stock_qty||0, image_url:p.image_url||'' }); setShowForm(true) }
+  function add(){ setEditing(null); setFd(empty); setShowForm(true) }
+  if(loading) return <div className="p-8 flex justify-center"><div className="w-8 h-8 border-4 border-[#0058A3] border-t-transparent rounded-full animate-spin"/></div>
   return (
     <div className="p-6 lg:p-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Master Barang</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Kelola produk & stok</p>
+      <div className="flex justify-between items-center mb-6"><div><h2 className="text-2xl font-bold text-gray-900">Master Barang</h2><p className="text-sm text-gray-500 mt-0.5">Kelola produk & stok</p></div><button onClick={add} className="flex items-center gap-2 px-4 py-2 bg-[#0058A3] text-white rounded-lg hover:bg-[#004080] shadow-sm"><Plus className="w-4 h-4"/><span className="text-sm font-medium">Tambah Produk</span></button></div>
+      {msg.text&&<div className={`mb-4 px-4 py-3 rounded-lg text-sm animate-fade-in ${msg.type==='success'?'bg-green-50 text-green-700 border border-green-200':'bg-red-50 text-red-700 border border-red-200'}`}>{msg.text}</div>}
+      <div className="mb-4 relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Cari produk, IMEI, atau brand..." className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0058A3] outline-none"/></div>
+      {showForm&&<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in"><div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"><div className="flex justify-between items-center p-6 border-b sticky top-0 bg-white z-10"><h3 className="text-lg font-bold">{editing?'Edit Produk':'Tambah Produk Baru'}</h3><button onClick={()=>setShowForm(false)} className="p-1 hover:bg-gray-100 rounded"><X className="w-5 h-5"/></button></div>
+        <form onSubmit={submit} className="p-6 space-y-4"><div className="grid grid-cols-2 gap-4">
+          <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1.5">Nama Produk *</label><input type="text" required value={fd.name} onChange={e=>setFd({...fd,name:e.target.value})} className="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#0058A3] outline-none" placeholder="iPhone 15 Pro Max"/></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Kategori *</label><select value={fd.category} onChange={e=>setFd({...fd,category:e.target.value})} className="w-full px-4 py-2.5 border rounded-lg bg-white"><option value="hp">Handphone</option><option value="aksesoris">Aksesoris</option></select></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Tipe *</label><select value={fd.type} onChange={e=>setFd({...fd,type:e.target.value})} className="w-full px-4 py-2.5 border rounded-lg bg-white"><option value="new">Baru</option><option value="second">Second</option><option value="consignment">Konsinyasi</option></select></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Brand</label><input value={fd.brand} onChange={e=>setFd({...fd,brand:e.target.value})} className="w-full px-4 py-2.5 border rounded-lg outline-none" placeholder="Apple, Samsung"/></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Model</label><input value={fd.model} onChange={e=>setFd({...fd,model:e.target.value})} className="w-full px-4 py-2.5 border rounded-lg outline-none" placeholder="iPhone 15 Pro"/></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Storage</label><input value={fd.storage} onChange={e=>setFd({...fd,storage:e.target.value})} className="w-full px-4 py-2.5 border rounded-lg outline-none" placeholder="128GB"/></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Warna</label><input value={fd.color} onChange={e=>setFd({...fd,color:e.target.value})} className="w-full px-4 py-2.5 border rounded-lg outline-none" placeholder="Black"/></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1.5">IMEI</label><input value={fd.imei} onChange={e=>setFd({...fd,imei:e.target.value})} className="w-full px-4 py-2.5 border rounded-lg outline-none" placeholder="Untuk HP"/></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Stok (aksesoris)</label><input type="number" value={fd.stock_qty} onChange={e=>setFd({...fd,stock_qty:e.target.value})} className="w-full px-4 py-2.5 border rounded-lg outline-none" placeholder="0"/></div>
+          <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1.5">URL Gambar</label><input type="url" value={fd.image_url} onChange={e=>setFd({...fd,image_url:e.target.value})} className="w-full px-4 py-2.5 border rounded-lg outline-none" placeholder="https://..."/></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Status *</label><select value={fd.status} onChange={e=>setFd({...fd,status:e.target.value})} className="w-full px-4 py-2.5 border rounded-lg bg-white"><option value="available">Tersedia</option><option value="sold">Terjual</option><option value="reserved">Reservasi</option><option value="damaged">Rusak</option></select></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1.5">HPP (Modal) *</label><input type="number" required value={fd.hpp} onChange={e=>setFd({...fd,hpp:e.target.value})} className="w-full px-4 py-2.5 border rounded-lg outline-none" placeholder="10000000"/></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Harga Jual *</label><input type="number" required value={fd.harga_jual} onChange={e=>setFd({...fd,harga_jual:e.target.value})} className="w-full px-4 py-2.5 border rounded-lg outline-none" placeholder="12000000"/></div>
         </div>
-        <button
-          onClick={handleAdd}
-          className="flex items-center gap-2 px-4 py-2 bg-[#0058A3] text-white rounded-lg hover:bg-[#004080] transition-colors shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          <span className="text-sm font-medium">Tambah Produk</span>
-        </button>
+        <div className="flex gap-3 pt-4 border-t"><button type="button" onClick={()=>setShowForm(false)} className="flex-1 px-4 py-2.5 border text-gray-700 rounded-lg hover:bg-gray-50 font-medium">Batal</button><button type="submit" className="flex-1 px-4 py-2.5 bg-[#0058A3] text-white rounded-lg hover:bg-[#004080] font-medium flex items-center justify-center gap-2"><Check className="w-4 h-4"/>{editing?'Update':'Simpan'}</button></div>
+      </form></div></div>}
+      <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+        {!filtered.length?<div className="p-12 text-center text-gray-400"><Package className="w-16 h-16 mx-auto mb-3 opacity-30"/><p className="text-lg font-medium">Belum ada produk</p></div>:
+        <div className="overflow-x-auto"><table className="w-full"><thead><tr className="bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase"><th className="text-left p-3">Produk</th><th className="text-left p-3">Kategori</th><th className="text-left p-3">Storage</th><th className="text-left p-3">HPP</th><th className="text-left p-3">Harga Jual</th><th className="text-left p-3">Stok</th><th className="text-left p-3">Status</th><th className="text-right p-3">Aksi</th></tr></thead>
+          <tbody className="divide-y">{filtered.map(p=>(<tr key={p.id} className="hover:bg-gray-50"><td className="p-3"><div className="flex items-center gap-3">{p.image_url?<img src={p.image_url} alt="" className="w-9 h-9 rounded-lg object-cover"/>:<div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center"><Package className="w-5 h-5 text-[#0058A3]"/></div>}<div><p className="text-sm font-medium">{p.name}</p><p className="text-xs text-gray-500">{p.brand} {p.model}</p></div></div></td><td className="p-3"><span className="px-2 py-0.5 rounded text-xs bg-gray-100">{p.category?.toUpperCase()}</span></td><td className="p-3 text-sm text-gray-600">{p.storage||'-'}</td><td className="p-3 text-sm text-gray-600">{rp(p.hpp)}</td><td className="p-3 text-sm font-semibold text-[#0058A3]">{rp(p.harga_jual)}</td><td className="p-3 text-sm">{p.category==='hp'?'1 unit':(p.stock_qty||0)}</td><td className="p-3"><span className={`px-2 py-0.5 rounded text-xs font-medium ${p.status==='available'?'bg-green-100 text-green-700':p.status==='sold'?'bg-gray-100 text-gray-500':p.status==='reserved'?'bg-yellow-100 text-yellow-700':'bg-red-100 text-red-700'}`}>{p.status?.toUpperCase()}</span></td><td className="p-3 text-right"><div className="flex justify-end gap-2"><button onClick={()=>edit(p)} className="p-1.5 hover:bg-blue-50 rounded text-[#0058A3]"><Edit2 className="w-4 h-4"/></button><button onClick={()=>del(p.id)} className="p-1.5 hover:bg-red-50 rounded text-red-600"><Trash2 className="w-4 h-4"/></button></div></td></tr>))}</tbody></table></div>}
       </div>
-
-      {message.text && (
-        <div className={`mb-4 px-4 py-3 rounded-lg text-sm animate-fade-in ${
-          message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
-        }`}>
-          {message.text}
-        </div>
-      )}
-
-      <div className="mb-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari produk, IMEI, atau brand..."
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0058A3] focus:border-transparent outline-none"
-          />
-        </div>
-      </div>
-
-      {showForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
-              <h3 className="text-lg font-bold text-gray-900">
-                {editingProduct ? 'Edit Produk' : 'Tambah Produk Baru'}
-              </h3>
-              <button
-                onClick={() => setShowForm(false)}
-                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Nama Produk *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0058A3] focus:border-transparent outline-none"
-                    placeholder="iPhone 15 Pro Max"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Kategori *</label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0058A3] focus:border-transparent outline-none bg-white"
-                  >
-                    <option value="hp">Handphone</option>
-                    <option value="aksesoris">Aksesoris</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Tipe *</label>
-                  <select
-                    value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0058A3] focus:border-transparent outline-none bg-white"
-                  >
-                    <option value="new">Baru</option>
-                    <option value="second">Second</option>
-                    <option value="consignment">Konsinyasi</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Brand</label>
-                  <input
-                    type="text"
-                    value={formData.brand}
-                    onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0058A3] focus:border-transparent outline-none"
-                    placeholder="Apple, Samsung, dll"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Model</label>
-                  <input
-                    type="text"
-                    value={formData.model}
-                    onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0058A3] focus:border-transparent outline-none"
-                    placeholder="iPhone 15 Pro"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Storage</label>
-                  <input
-                    type="text"
-                    value={formData.storage}
-                    onChange={(e) => setFormData({ ...formData, storage: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0058A3] focus:border-transparent outline-none"
-                    placeholder="128GB, 256GB"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Warna</label>
-                  <input
-                    type="text"
-                    value={formData.color}
-                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0058A3] focus:border-transparent outline-none"
-                    placeholder="Black, White, Blue"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">IMEI</label>
-                  <input
-                    type="text"
-                    value={formData.imei}
-                    onChange={(e) => setFormData({ ...formData, imei: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0058A3] focus:border-transparent outline-none"
-                    placeholder="Untuk HP saja (opsional)"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Status *</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0058A3] focus:border-transparent outline-none bg-white"
-                  >
-                    <option value="available">Tersedia</option>
-                    <option value="sold">Terjual</option>
-                    <option value="reserved">Reservasi</option>
-                    <option value="damaged">Rusak</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">HPP (Modal) *</label>
-                  <input
-                    type="number"
-                    required
-                    value={formData.hpp}
-                    onChange={(e) => setFormData({ ...formData, hpp: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0058A3] focus:border-transparent outline-none"
-                    placeholder="10000000"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Harga Jual *</label>
-                  <input
-                    type="number"
-                    required
-                    value={formData.harga_jual}
-                    onChange={(e) => setFormData({ ...formData, harga_jual: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0058A3] focus:border-transparent outline-none"
-                    placeholder="12000000"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={() => setShowForm(false)}
-                  className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2.5 bg-[#0058A3] text-white rounded-lg hover:bg-[#004080] transition-colors font-medium flex items-center justify-center gap-2"
-                >
-                  <Check className="w-4 h-4" />
-                  {editingProduct ? 'Update' : 'Simpan'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        {filteredProducts.length === 0 ? (
-          <div className="p-12 text-center text-gray-400">
-            <Package className="w-16 h-16 mx-auto mb-3 opacity-30" />
-            <p className="text-lg font-medium">Belum ada produk</p>
-            <p className="text-sm mt-1">Klik "Tambah Produk" untuk menambahkan</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Nama Produk</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Kategori</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Storage</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Harga Jual</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Status</th>
-                  <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filteredProducts.map((product) => (
-                  <tr key={product.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center">
-                          <Package className="w-5 h-5 text-[#0058A3]" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{product.name}</p>
-                          <p className="text-xs text-gray-500">{product.brand} {product.model}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
-                        {product.category?.toUpperCase() || '-'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-sm text-gray-600">{product.storage || '-'}</td>
-                    <td className="py-3 px-4 text-sm font-semibold text-[#0058A3]">{formatRupiah(product.harga_jual)}</td>
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                        product.status === 'available' ? 'bg-green-100 text-green-700' :
-                        product.status === 'sold' ? 'bg-gray-100 text-gray-500' :
-                        product.status === 'reserved' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-red-100 text-red-700'
-                      }`}>
-                        {product.status?.toUpperCase() || 'AVAILABLE'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleEdit(product)}
-                          className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors text-[#0058A3]"
-                          title="Edit"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => deleteProduct(product.id)}
-                          className="p-1.5 hover:bg-red-50 rounded-lg transition-colors text-red-600"
-                          title="Hapus"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      <div className="mt-4 text-sm text-gray-500">
-        Total: {filteredProducts.length} produk
-      </div>
-    </div>
-  )
+      <p className="mt-4 text-sm text-gray-500">Total: {filtered.length} produk</p>
+    </div> )
 }
