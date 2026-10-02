@@ -5,29 +5,27 @@ import { format, subDays, startOfDay, endOfDay } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { DollarSign, Package, TrendingUp, ShoppingCart, Layers, AlertTriangle, Archive, Wallet } from 'lucide-react'
 const rp = n => new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(n||0)
-
 export default function Dashboard() {
   const [s, setS] = useState({sales:0,hpp:0,profit:0,tx:0,totalTx:0,totalProd:0,totalStock:0,low:0,capital:0})
   const [chart, setChart] = useState([])
   const [lowList, setLowList] = useState([])
   const [load, setLoad] = useState(true)
-
-  useEffect(() => { run() }, [])
-  async function run() {
+  useEffect(()=>{ run() },[])
+  async function run(){
     const today = new Date()
     const [txToday, allTx, prods, cap] = await Promise.all([
       supabase.from('transactions').select('total_amount, transaction_items(hpp_at_sale, qty)').gte('created_at', startOfDay(today).toISOString()).lte('created_at', endOfDay(today).toISOString()),
-      supabase.from('transactions').select('id', { count: 'exact', head: true }),
+      supabase.from('transactions').select('id', { count:'exact', head:true }),
       supabase.from('products').select('name, category, stock_qty, status, storage, color'),
       supabase.from('capital_transactions').select('type, amount')
     ])
     let sales=0, hpp=0
     ;(txToday.data||[]).forEach(t=>{ sales+=+t.total_amount||0; (t.transaction_items||[]).forEach(i=>{ hpp+=(+i.hpp_at_sale||0)*(i.qty||1) }) })
-    const avail = (prods.data||[]).filter(p=>p.status==='available')
-    const hpCount = avail.filter(p=>p.category==='hp').length
-    const acc = avail.filter(p=>p.category==='aksesoris')
-    const stock = hpCount + acc.reduce((a,p)=>a+(+p.stock_qty||0),0)
-    const lowArr = acc.filter(p=>(+p.stock_qty||0)<=5)
+    const avail=(prods.data||[]).filter(p=>p.status==='available')
+    const hpCount=avail.filter(p=>p.category==='hp').length
+    const acc=avail.filter(p=>p.category==='aksesoris')
+    const stock=hpCount+acc.reduce((a,p)=>a+(+p.stock_qty||0),0)
+    const lowArr=acc.filter(p=>(+p.stock_qty||0)<=5)
     let capital=0; (cap.data||[]).forEach(c=>{ capital += c.type==='capital_in'?(+c.amount||0):-(+c.amount||0) })
     const ch=[]
     for(let i=6;i>=0;i--){ const d=subDays(today,i); const r=await supabase.from('transactions').select('total_amount').gte('created_at',startOfDay(d).toISOString()).lte('created_at',endOfDay(d).toISOString()); ch.push({date:format(d,'dd MMM',{locale:id}), penjualan:(r.data||[]).reduce((a,t)=>a+(+t.total_amount||0),0)}) }
@@ -63,6 +61,5 @@ export default function Dashboard() {
         </div>
       </div>
       <p className="text-center text-xs text-gray-400">Design & Develop By <span className="font-semibold text-gray-600">Fancell Team</span></p>
-    </div>
-  )
+    </div> )
 }
