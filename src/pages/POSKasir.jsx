@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import { Search, ShoppingCart, Trash2, Plus, Minus, X, Image } from 'lucide-react'
+import { Search, ShoppingCart, Trash2, Plus, Minus, X, Image, CreditCard, Check, Printer } from 'lucide-react'
 
 export default function POSKasir() {
   const [products, setProducts] = useState([])
@@ -10,9 +10,16 @@ export default function POSKasir() {
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [customerName, setCustomerName] = useState('')
   const [loading, setLoading] = useState(true)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [paymentMethods, setPaymentMethods] = useState([])
+  const [selectedPayment, setSelectedPayment] = useState(null)
+  const [processing, setProcessing] = useState(false)
+  const [showSuccess, setShowSuccess] = useState(false)
+  const [lastTransaction, setLastTransaction] = useState(null)
 
   useEffect(() => {
     loadProducts()
+    loadPaymentMethods()
   }, [])
 
   useEffect(() => {
@@ -35,14 +42,29 @@ export default function POSKasir() {
     }
   }
 
+  async function loadPaymentMethods() {
+    try {
+      const { data, error } = await supabase
+        .from('payment_methods')
+        .select('*')
+        .eq('is_active', true)
+        .order('name')
+      
+      if (!error) setPaymentMethods(data || [])
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
   function filterProducts() {
     let filtered = products
     
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       filtered = filtered.filter(p => 
-        p.name.toLowerCase().includes(query) || 
-        p.imei?.toLowerCase().includes(query)
+        p.name?.toLowerCase().includes(query) || 
+        p.imei?.toLowerCase().includes(query) ||
+        p.brand?.toLowerCase().includes(query)
       )
     }
     
@@ -86,7 +108,7 @@ export default function POSKasir() {
     setCustomerName('')
   }
 
-  const subtotal = cart.reduce((sum, item) => sum + (item.harga_jual * item.qty), 0)
+  const subtotal = cart.reduce((sum, item) => sum + ((item.harga_jual || 0) * item.qty), 0)
   const total = subtotal
 
   const categories = [
@@ -99,10 +121,107 @@ export default function POSKasir() {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka || 0)
   }
 
+  async function handlePayment() {
+    if (!selectedPayment) {
+      alert('Pilih metode pembayaran terlebih dahulu')
+      return
+    }
+
+    setProcessing(true)
+
+    try {
+      // 1. Hitung admin fee
+      const adminFee = (subtotal * (selectedPayment.admin_fee_percentage || 0) / 100) + (selectedPayment.admin_fee_fixed || 0)
+
+      // 2. Insert transaksi
+      const { data: transaction, error: txError } = await supabase
+        .from('transactions')
+        .insert({
+          cashier_id: null, // Akan di-set dari user yang login
+          customer_name: customerName || 'Walk-in Customer',
+          subtotal: subtotal,
+          discount_amount: 0,
+          total_amount: total,
+          payment_status: 'paid',
+          transaction_type: 'sale',
+          notes: `Pembayaran via ${selectedPayment.name}`
+        })
+        .select()
+        .single()
+
+      if (txError) throw txError
+
+      // 3. Insert transaction items
+      const itemsToInsert = cart.map(item => ({
+        transaction_id: transaction.id,
+        product_id: item.id,
+        product_name: item.name,
+        imei: item.imei,
+        qty: item.qty,
+        price_at_sale: item.harga_jual,
+        hpp_at_sale: item.hpp || 0
+      }))
+
+      const { error: itemsError } = await supabase
+        .from('transaction_items')
+        .insert(itemsToInsert)
+
+      if (itemsError) throw itemsError
+
+      // 4. Insert payment
+      const { error: paymentError } = await supabase
+        .from('payments')
+        .insert({
+          transaction_id: transaction.id,
+          payment_method_id: selectedPayment.id,
+          amount: total,
+          admin_fee: adminFee,
+          reference_number: `TRX-${Date.now()}`,
+          notes: selectedPayment.name
+        })
+
+      if (paymentError) throw paymentError
+
+      // 5. Update status produk jadi 'sold'
+      for (const item of cart) {
+        await supabase
+          .from('products')
+          .update({ status: 'sold' })
+          .eq('id', item.id)
+      }
+
+      // 6. Success
+      setLastTransaction({
+        id: transaction.id,
+        total: total,
+        items: cart,
+        payment: selectedPayment,
+        customer: customerName
+      })
+      setShowSuccess(true)
+      clearCart()
+      loadProducts() // Reload produk yang available
+
+    } catch (err) {
+      console.error('Error processing payment:', err)
+      alert('Gagal memproses transaksi: ' + err.message)
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  function handleCheckout() {
+    if (cart.length === 0) {
+      alert('Keranjang masih kosong')
+      return
+    }
+    setShowPaymentModal(true)
+  }
+
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-[#0058A3] border-t-transparent rounded-full animate-spin-slow"></div>
+        <div className="w-8 h-8 border-4 border-[#0058A3] border-t-transparent rounded-full animate-spin"></div>
       </div>
     )
   }
@@ -158,7 +277,7 @@ export default function POSKasir() {
                 <button
                   key={product.id}
                   onClick={() => addToCart(product)}
-                  className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-200 group"
+                  className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-200 group text-left"
                 >
                   <div className="aspect-square bg-gray-100 flex items-center justify-center relative overflow-hidden">
                     {product.image_url ? (
@@ -262,7 +381,7 @@ export default function POSKasir() {
                     </button>
                   </div>
                   <span className="text-sm font-bold text-[#0058A3]">
-                    {formatRupiah(item.harga_jual * item.qty)}
+                    {formatRupiah((item.harga_jual || 0) * item.qty)}
                   </span>
                 </div>
               </div>
@@ -284,14 +403,154 @@ export default function POSKasir() {
           </div>
           
           <button
+            onClick={handleCheckout}
             disabled={cart.length === 0}
             className="w-full bg-[#0058A3] text-white py-3 rounded-lg font-semibold hover:bg-[#004080] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            <ShoppingCart className="w-5 h-5" />
+            <CreditCard className="w-5 h-5" />
             Bayar — Metode & Split Payment
           </button>
         </div>
       </div>
+
+      {/* Payment Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-lg font-bold text-gray-900">Pilih Metode Pembayaran</h3>
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                <p className="text-sm text-gray-600">Total Pembayaran</p>
+                <p className="text-2xl font-bold text-[#0058A3]">{formatRupiah(total)}</p>
+              </div>
+
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {paymentMethods.map(method => (
+                  <button
+                    key={method.id}
+                    onClick={() => setSelectedPayment(method)}
+                    className={`w-full flex items-center justify-between p-3 rounded-lg border-2 transition-all ${
+                      selectedPayment?.id === method.id
+                        ? 'border-[#0058A3] bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                        <CreditCard className="w-5 h-5 text-gray-600" />
+                      </div>
+                      <div className="text-left">
+                        <p className="text-sm font-medium text-gray-900">{method.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {method.admin_fee_percentage > 0 && `Fee ${method.admin_fee_percentage}%`}
+                          {method.admin_fee_fixed > 0 && ` + ${formatRupiah(method.admin_fee_fixed)}`}
+                          {method.admin_fee_percentage === 0 && method.admin_fee_fixed === 0 && 'Tanpa biaya admin'}
+                        </p>
+                      </div>
+                    </div>
+                    {selectedPayment?.id === method.id && (
+                      <Check className="w-5 h-5 text-[#0058A3]" />
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowPaymentModal(false)}
+                  className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handlePayment}
+                  disabled={!selectedPayment || processing}
+                  className="flex-1 px-4 py-2.5 bg-[#0058A3] text-white rounded-lg hover:bg-[#004080] transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {processing ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Memproses...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Bayar Sekarang
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccess && lastTransaction && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Check className="w-8 h-8 text-green-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Transaksi Berhasil!</h3>
+              <p className="text-sm text-gray-500 mb-4">Pembayaran telah diproses</p>
+              
+              <div className="bg-gray-50 rounded-lg p-4 mb-4 text-left">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">No. Transaksi</span>
+                    <span className="font-mono text-xs">{lastTransaction.id.slice(0, 8)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Customer</span>
+                    <span className="font-medium">{lastTransaction.customer || 'Walk-in'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Metode</span>
+                    <span className="font-medium">{lastTransaction.payment.name}</span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-gray-200">
+                    <span className="text-gray-900 font-semibold">Total</span>
+                    <span className="font-bold text-[#0058A3]">{formatRupiah(lastTransaction.total)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowSuccess(false)
+                    setLastTransaction(null)
+                  }}
+                  className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium flex items-center justify-center gap-2"
+                >
+                  <Printer className="w-4 h-4" />
+                  Cetak Struk
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSuccess(false)
+                    setLastTransaction(null)
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-[#0058A3] text-white rounded-lg hover:bg-[#004080] transition-colors font-medium"
+                >
+                  Transaksi Baru
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
