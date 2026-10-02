@@ -4,7 +4,6 @@ import { DollarSign, Package, TrendingUp, TrendingDown, Receipt, Percent } from 
 import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { id } from 'date-fns/locale'
 const rp = n => new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(n||0)
-
 export default function LabaRugi() {
   const [from,setFrom]=useState(format(startOfMonth(new Date()),'yyyy-MM-dd'))
   const [to,setTo]=useState(format(endOfMonth(new Date()),'yyyy-MM-dd'))
@@ -15,7 +14,7 @@ export default function LabaRugi() {
     setLoad(true)
     const [tx,op]=await Promise.all([
       supabase.from('transactions').select('total_amount, transaction_items(hpp_at_sale,qty), payments(admin_fee)').gte('created_at',from).lte('created_at',to+'T23:59:59'),
-      supabase.from('operational_costs').select('amount').gte('date',from).lte('to')
+      supabase.from('operational_costs').select('amount').gte('date',from).lte(to)
     ])
     let rev=0,hpp=0,fee=0
     ;(tx.data||[]).forEach(t=>{ rev+=+t.total_amount||0; (t.transaction_items||[]).forEach(i=>hpp+=(+i.hpp_at_sale||0)*(i.qty||1)); (t.payments||[]).forEach(p=>fee+=+p.admin_fee||0) })
@@ -49,7 +48,6 @@ export default function LabaRugi() {
           <div className="flex justify-between py-4 px-4 rounded-lg bg-green-50"><span className="font-bold text-green-700 text-base">Laba Bersih</span><span className={`font-bold text-base ${d.net>=0?'text-green-700':'text-red-700'}`}>{rp(d.net)}</span></div>
         </div>
       </div>
-    </div>
-  )
+    </div> )
 }
 function Line({l,v,red}){return <div className="flex justify-between py-3 border-b border-gray-100"><span className="text-gray-700">{l}</span><span className={`font-semibold ${red?'text-red-600':'text-gray-900'}`}>{v}</span></div>}
