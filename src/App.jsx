@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ToastProvider } from './components/ui'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -17,15 +18,16 @@ function MainApp() {
   const { user, role } = useAuth(); const [page, setPage] = useState('dashboard')
   if (!user) return <Login />
   const titles = { dashboard:'Dashboard', kasir:'POS Kasir', 'metode-bayar':'Metode Pembayaran', cetak:'Cetak / Printer', barang:'Master Barang', riwayat:'Riwayat Transaksi', garansi:'Tracking Garansi', 'laba-rugi':'Laba Rugi', modal:'Keuntungan & Modal', pengaturan:'Pengaturan' }
-  const render = () => { switch(page){
+  const render = () => { switch (page) {
     case 'dashboard': return <Dashboard/>; case 'kasir': return <POSKasir/>; case 'metode-bayar': return <MetodeBayar/>; case 'cetak': return <CetakPrinter/>; case 'barang': return <MasterBarang/>; case 'riwayat': return <RiwayatTransaksi/>; case 'garansi': return <Garansi/>; case 'laba-rugi': return <LabaRugi/>; case 'modal': return <KeuntunganModal/>; case 'pengaturan': return <Settings/>; default: return <Dashboard/> } }
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar currentPage={page} setCurrentPage={setPage}/>
       <div className="flex-1 flex flex-col min-w-0">
-        <Header user={user} role={role} title={titles[page]||'Dashboard'} showDateFilter={page==='dashboard'}/>
+        <Header user={user} role={role} title={titles[page] || 'Dashboard'} showDateFilter={page === 'dashboard'}/>
         <main className="flex-1 overflow-y-auto">{render()}</main>
       </div>
-    </div> )
+    </div>
+  )
 }
-export default function App(){ return <AuthProvider><MainApp/></AuthProvider> }
+export default function App() { return <ToastProvider><AuthProvider><MainApp/></AuthProvider></ToastProvider> }
