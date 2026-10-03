@@ -16,3 +16,14 @@
 .animate-count-up{animation:countUp .5s ease-out forwards}
 .animate-spin{animation:spin 1s linear infinite}
 .stagger-1{animation-delay:.05s;opacity:0}.stagger-2{animation-delay:.1s;opacity:0}.stagger-3{animation-delay:.15s;opacity:0}.stagger-4{animation-delay:.2s;opacity:0}.stagger-5{animation-delay:.25s;opacity:0}.stagger-6{animation-delay:.3s;opacity:0}.stagger-7{animation-delay:.35s;opacity:0}.stagger-8{animation-delay:.4s;opacity:0}
+
+/* ===== STRUK (preview di modal = cetakan thermal) ===== */
+.struk { font-family:'Courier New',ui-monospace,monospace; font-size:11px; width:268px; margin:0 auto; color:#111827; line-height:1.5; }
+.struk .c { text-align:center; }
+.struk .b { font-weight:700; }
+.struk .hr { border-top:1px dashed #9ca3af; margin:5px 0; }
+.struk .r { display:flex; justify-content:space-between; gap:8px; margin:1px 0; }
+.struk .r span:last-child { white-space:nowrap; text-align:right; }
+.struk small { font-size:9px; color:#6b7280; }
+.struk .big { font-size:15px; }
+.struk .small { font-size:9px; line-height:1.35; color:#374151; }
