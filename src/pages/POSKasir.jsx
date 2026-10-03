@@ -5,7 +5,7 @@ import { useStoreSettings } from '../lib/useStoreSettings'
 import { useToast, rp, RupiahInput } from '../components/ui'
 import { Search, ShoppingCart, Trash2, Plus, Minus, X, Image, CreditCard, Check, Printer, Percent, Repeat, ShieldCheck, Smartphone } from 'lucide-react'
 const vlabel = v => [v.color, v.storage].filter(x => x && x !== '-').join(' - ') || 'Standar'
-const displayName = m => m.is_installment && m.cicilan_label ? m.cicilan_label : m.name
+const displayName = m => m && m.is_installment && m.cicilan_label ? m.cicilan_label : (m ? m.name : '')
 export default function POSKasir() {
   const { user } = useAuth(); const ST = useStoreSettings(); const toast = useToast()
   const [products, setProducts] = useState([]); const [methods, setMethods] = useState([])
