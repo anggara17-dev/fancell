@@ -1,7 +1,6 @@
 import { useState, useEffect, createContext, useContext } from 'react'
 import { X, Check, AlertTriangle, Info, Loader2 } from 'lucide-react'
 
-/* ===== TOAST (ganti alert/confirm browser) ===== */
 const ToastCtx = createContext(null)
 export function ToastProvider({ children }) {
   const [list, setList] = useState([])
@@ -22,7 +21,6 @@ export function ToastProvider({ children }) {
 }
 export const useToast = () => useContext(ToastCtx) || { success(){}, error(){}, info(){} }
 
-/* ===== MODAL SHELL (overlay + Esc + klik luar) ===== */
 export function Modal({ open, onClose, title, children, maxWidth = 'max-w-md', footer }) {
   useEffect(() => { if (!open) return; const h = e => { if (e.key === 'Escape') onClose?.() }; window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h) }, [open, onClose])
   if (!open) return null
@@ -37,7 +35,6 @@ export function Modal({ open, onClose, title, children, maxWidth = 'max-w-md', f
   )
 }
 
-/* ===== CONFIRM (ganti window.confirm) ===== */
 export function Confirm({ open, message, title = 'Konfirmasi', confirmText = 'Ya, Lanjut', danger, busy, onConfirm, onClose }) {
   const [loading, setLoading] = useState(false)
   useEffect(() => { if (!open) setLoading(false) }, [open])
@@ -56,7 +53,6 @@ export function Confirm({ open, message, title = 'Konfirmasi', confirmText = 'Ya
   )
 }
 
-/* ===== INPUT RUPIAH (ketik langsung bertitik) ===== */
 export function RupiahInput({ value, onChange, className = '', placeholder = '0', disabled }) {
   const fmt = v => (v === '' || v == null) ? '' : Number(String(v).replace(/\D/g, '')).toLocaleString('id-ID')
   return <input inputMode="numeric" disabled={disabled} value={fmt(value)} onChange={e => { const d = e.target.value.replace(/\D/g, ''); onChange(d ? Number(d) : 0) }} className={className} placeholder={placeholder}/>
