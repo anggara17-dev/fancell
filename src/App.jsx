@@ -7,27 +7,18 @@ import MetodeBayar from './pages/MetodeBayar'
 import CetakPrinter from './pages/CetakPrinter'
 import MasterBarang from './pages/MasterBarang'
 import RiwayatTransaksi from './pages/RiwayatTransaksi'
+import Garansi from './pages/Garansi'
 import LabaRugi from './pages/LabaRugi'
 import KeuntunganModal from './pages/KeuntunganModal'
 import Settings from './pages/Settings'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 function MainApp() {
-  const { user, role } = useAuth()
-  const [page, setPage] = useState('dashboard')
+  const { user, role } = useAuth(); const [page, setPage] = useState('dashboard')
   if (!user) return <Login />
-  const titles = { dashboard:'Dashboard', kasir:'POS Kasir', 'metode-bayar':'Metode Pembayaran', cetak:'Cetak / Printer', barang:'Master Barang', riwayat:'Riwayat Transaksi', 'laba-rugi':'Laba Rugi', modal:'Keuntungan & Modal', pengaturan:'Pengaturan' }
+  const titles = { dashboard:'Dashboard', kasir:'POS Kasir', 'metode-bayar':'Metode Pembayaran', cetak:'Cetak / Printer', barang:'Master Barang', riwayat:'Riwayat Transaksi', garansi:'Tracking Garansi', 'laba-rugi':'Laba Rugi', modal:'Keuntungan & Modal', pengaturan:'Pengaturan' }
   const render = () => { switch(page){
-    case 'dashboard': return <Dashboard/>
-    case 'kasir': return <POSKasir/>
-    case 'metode-bayar': return <MetodeBayar/>
-    case 'cetak': return <CetakPrinter/>
-    case 'barang': return <MasterBarang/>
-    case 'riwayat': return <RiwayatTransaksi/>
-    case 'laba-rugi': return <LabaRugi/>
-    case 'modal': return <KeuntunganModal/>
-    case 'pengaturan': return <Settings/>
-    default: return <Dashboard/> } }
+    case 'dashboard': return <Dashboard/>; case 'kasir': return <POSKasir/>; case 'metode-bayar': return <MetodeBayar/>; case 'cetak': return <CetakPrinter/>; case 'barang': return <MasterBarang/>; case 'riwayat': return <RiwayatTransaksi/>; case 'garansi': return <Garansi/>; case 'laba-rugi': return <LabaRugi/>; case 'modal': return <KeuntunganModal/>; case 'pengaturan': return <Settings/>; default: return <Dashboard/> } }
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar currentPage={page} setCurrentPage={setPage}/>
