@@ -4,11 +4,13 @@ import { ShieldCheck, Search, Calendar, Printer } from 'lucide-react'
 import { format, startOfMonth } from 'date-fns'
 import { rp } from '../components/ui'
 const today = () => format(new Date(), 'yyyy-MM-dd')
+const isoFrom = d => new Date(d + 'T00:00:00').toISOString()
+const isoTo = d => new Date(d + 'T23:59:59.999').toISOString()
 export default function Garansi() {
   const [rows, setRows] = useState([]); const [load, setLoad] = useState(true)
   const [q, setQ] = useState(''); const [from, setFrom] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd')); const [to, setTo] = useState(today())
   useEffect(() => { run() }, [from, to])
-  async function run() { setLoad(true); const { data } = await supabase.from('transactions').select('id, invoice_no, customer_name, customer_phone, created_at, warranty_type, warranty_months, total_amount, transaction_items(product_name, variant_label, imei, price_at_sale)').gte('created_at', from + 'T00:00:00').lte('created_at', to + 'T23:59:59').neq('warranty_type', 'none').order('created_at', { ascending: false }); setRows(data || []); setLoad(false) }
+  async function run() { setLoad(true); const { data } = await supabase.from('transactions').select('id, invoice_no, customer_name, customer_phone, created_at, warranty_type, warranty_months, total_amount, transaction_items(product_name, variant_label, imei, price_at_sale)').gte('created_at', isoFrom(from)).lte('created_at', isoTo(to)).neq('warranty_type', 'none').order('created_at', { ascending: false }); setRows(data || []); setLoad(false) }
   const f = rows.filter(r => { const s = q.toLowerCase(); if (!s) return true; return r.customer_name?.toLowerCase().includes(s) || r.invoice_no?.toLowerCase().includes(s) || (r.transaction_items || []).some(i => i.imei?.toLowerCase().includes(s) || i.product_name?.toLowerCase().includes(s)) })
   const expiry = r => { const d = new Date(r.created_at); d.setMonth(d.getMonth() + (+r.warranty_months || 0)); return d }
   const statusG = r => { const e = expiry(r); const now = new Date(); if (e < now) return { t: 'HABIS', c: 'bg-red-100 text-red-700' }; const days = Math.ceil((e - now) / 864e5); return days <= 14 ? { t: `SISA ${days} HARI`, c: 'bg-amber-100 text-amber-700' } : { t: 'AKTIF', c: 'bg-green-100 text-green-700' } }
