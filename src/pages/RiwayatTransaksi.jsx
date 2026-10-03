@@ -1,29 +1,85 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import { History, Search, Eye, Printer, X, Package } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import { useStoreSettings } from '../lib/useStoreSettings'
+import { History, Search, Eye, Printer, X, Package, Trash2, Edit2, Lock, Calendar } from 'lucide-react'
+import { format, startOfDay, endOfDay, startOfMonth, subDays } from 'date-fns'
+import { id } from 'date-fns/locale'
 const rp = n => new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(n||0)
+const today = () => format(new Date(),'yyyy-MM-dd')
 
-function ringkasProduk(t){
-  const items = t.transaction_items || []
-  if(!items.length) return '—'
-  const names = [...new Set(items.map(i=>i.product_name))]
-  const totalQty = items.reduce((a,i)=>a+(+i.qty||1),0)
-  if(names.length>1) return `${names.length} produk: ${names.join(', ')}`
-  if(totalQty>1) return `${names[0]} x${totalQty}`
-  return names[0]
-}
+function ringkasProduk(t){ const items=t.transaction_items||[]; if(!items.length) return '—'; const names=[...new Set(items.map(i=>i.product_name))]; const tq=items.reduce((a,i)=>a+(+i.qty||1),0); if(names.length>1) return `${names.length} produk: ${names.join(', ')}`; if(tq>1) return `${names[0]} x${tq}`; return names[0] }
 
 export default function Riwayat() {
+  const { user } = useAuth(); const ST = useStoreSettings()
   const [list,setList]=useState([]); const [q,setQ]=useState(''); const [det,setDet]=useState(null); const [load,setLoad]=useState(true)
-  useEffect(()=>{ run() },[])
-  async function run(){ const {data}=await supabase.from('transactions').select('*, transaction_items(product_name, imei, qty), payments(count)').order('created_at',{ascending:false}); setList(data||[]); setLoad(false) }
-  async function open(id){ const {data}=await supabase.from('transactions').select('*, transaction_items(*), payments(*), trade_ins(*)').eq('id',id).single(); setDet(data) }
-  const f=list.filter(t=>!q||t.customer_name?.toLowerCase().includes(q.toLowerCase())||t.invoice_no?.toLowerCase().includes(q.toLowerCase())||(t.transaction_items||[]).some(i=>i.product_name?.toLowerCase().includes(q.toLowerCase())))
-  const print=t=>{ const w=window.open('','_blank','width=380,height=680'); if(!w)return; const rows=(t.transaction_items||[]).map(i=>`<div class=r><span>${i.product_name}${i.qty>1?' x'+i.qty:''}${i.imei?'<br><small>'+i.imei+'</small>':''}</span><span>${rp(i.line_total)}</span></div>`).join(''); const ps=(t.payments||[]).map(p=>`<div class=r><span>Bayar (${p.method_name})</span><span>${rp(p.amount)}</span></div>`).join(''); w.document.write(`<html><head><title>${t.invoice_no||'Struk'}</title><style>@page{margin:4mm}body{font-family:'Courier New',monospace;font-size:11px;width:268px;margin:0 auto;padding:6px;color:#000;line-height:1.5}.c{text-align:center}.b{font-weight:bold}.hr{border-top:1px dashed #000;margin:5px 0}.r{display:flex;justify-content:space-between;gap:8px;margin:1px 0}.r span:last-child{white-space:nowrap;text-align:right}small{font-size:9px;color:#444}.big{font-size:15px}</style></head><body><div class="c b big">FANCELL</div><div class=hr></div><div class=r><span>No</span><span>${t.invoice_no||t.id.slice(0,8)}</span></div><div class=r><span>Tgl</span><span>${new Date(t.created_at).toLocaleString('id-ID')}</span></div><div class=r><span>Kasir</span><span>${t.cashier_name||'-'}</span></div><div class=r><span>Pelanggan</span><span>${t.customer_name||'Umum'}</span></div><div class=hr></div>${rows}<div class=hr></div><div class="r b big"><span>Total</span><span>${rp(t.total_amount)}</span></div>${ps}<div class=hr></div><div class="c b">Toko HP & Aksesoris Terpercaya</div></body></html>`); w.document.close(); w.focus(); setTimeout(()=>w.print(),350) }
+  const [from,setFrom]=useState(today()); const [to,setTo]=useState(today())
+  const [editTx,setEditTx]=useState(null); const [editForm,setEditForm]=useState({customer_name:'',customer_phone:'',notes:'',payment_status:'paid'})
+  const [zreport,setZreport]=useState(null); const [closing,setClosing]=useState(false)
+  useEffect(()=>{ run() },[from,to])
+
+  async function run(){
+    setLoad(true)
+    const { data } = await supabase.from('transactions').select('*, transaction_items(product_name, imei, qty, line_total), payments(count)').gte('created_at', from+'T00:00:00').lte('created_at', to+'T23:59:59').order('created_at',{ascending:false})
+    setList(data||[]); setLoad(false)
+  }
+  async function open(id){ const {data}=await supabase.from('transactions').select('*, transaction_items(*), payments(*), trade_ins(*), consignment_settlements(*)').eq('id',id).single(); setDet(data) }
+  const f=list.filter(t=>!q||t.customer_name?.toLowerCase().includes(q.toLowerCase())||t.invoice_no?.toLowerCase().includes(q.toLowerCase())||(t.transaction_items||[]).some(i=>i.product_name?.toLowerCase().includes(q.toLowerCase())||i.imei?.toLowerCase().includes(q.toLowerCase())))
+
+  // ---- RESTORE STOK (untuk hapus / void) ----
+  async function restoreStok(tx){
+    const { data:items } = await supabase.from('transaction_items').select('product_id, imei, qty, is_consignment').eq('transaction_id',tx.id)
+    for(const it of (items||[])){
+      if(it.imei) await supabase.from('product_imeis').update({ status:'available' }).eq('imei',it.imei)
+      else if(it.product_id) { const {data:v}=await supabase.from('product_variants').select('stock_qty').eq('id',it.product_id).single(); await supabase.from('product_variants').update({ stock_qty:(+v?.stock_qty||0)+(+it.qty||1) }).eq('id',it.product_id) }
+    }
+  }
+  async function hapus(tx){ if(!confirm(`Hapus transaksi ${tx.invoice_no||tx.id.slice(0,8)}?\nStok produk akan dikembalikan.`))return; try { await restoreStok(tx); const {error}=await supabase.from('transactions').delete().eq('id',tx.id); if(error) throw error; setDet(null); run() } catch(err){ alert('Gagal: '+err.message) } }
+  function startEdit(tx){ setEditTx(tx); setEditForm({ customer_name:tx.customer_name||'', customer_phone:tx.customer_phone||'', notes:tx.notes||'', payment_status:tx.payment_status||'paid' }) }
+  async function saveEdit(){ try { const voiding = (editForm.payment_status==='void'||editForm.payment_status==='refunded') && editTx.payment_status==='paid'; if(voiding) await restoreStok(editTx); const {error}=await supabase.from('transactions').update({ customer_name:editForm.customer_name, customer_phone:editForm.customer_phone, notes:editForm.notes, payment_status:editForm.payment_status }).eq('id',editTx.id); if(error) throw error; setEditTx(null); run() } catch(err){ alert('Gagal: '+err.message) } }
+
+  // ---- Z-REPORT / TUTUP KASIR ----
+  async function bukaZ(){
+    const { data } = await supabase.from('transactions').select('total_amount, payment_status, transaction_items(hpp_at_sale,qty), payments(method_name, amount, admin_fee)').gte('created_at', from+'T00:00:00').lte('created_at', to+'T23:59:59').eq('payment_status','paid')
+    let sales=0,hpp=0,fee=0; const bd={}
+    ;(data||[]).forEach(t=>{ sales+=+t.total_amount||0; (t.transaction_items||[]).forEach(i=>hpp+=(+i.hpp_at_sale||0)*(i.qty||1)); (t.payments||[]).forEach(p=>{ fee+=+p.admin_fee||0; bd[p.method_name]=(bd[p.method_name]||0)+(+p.amount||0) }) })
+    const { data:closed } = await supabase.from('daily_closes').select('*').eq('close_date', to).maybeSingle()
+    setZreport({ date:to, count:(data||[]).length, sales, hpp, profit:sales-hpp-fee, fee, breakdown:bd, already:!!closed, existing:closed })
+  }
+  async function tutupKasir(){
+    setClosing(true)
+    try {
+      const payload={ close_date:zreport.date, cashier_id:user?.id||null, cashier_name:user?.username||'Kasir', total_transactions:zreport.count, total_sales:zreport.sales, total_hpp:zreport.hpp, total_profit:zreport.profit, total_admin_fee:zreport.fee, payment_breakdown:zreport.breakdown }
+      const { error } = await supabase.from('daily_closes').upsert(payload, { onConflict:'close_date' })
+      if(error) throw error
+      setZreport({ ...zreport, already:true, saved:true }); run()
+    } catch(err){ alert('Gagal tutup kasir: '+err.message) } finally { setClosing(false) }
+  }
+  function printZ(){ const z=zreport; const rows=Object.entries(z.breakdown||{}).map(([m,a])=>`<div class=r><span>${m}</span><span>${rp(a)}</span></div>`).join(''); const w=window.open('','_blank','width=380,height=680'); if(!w)return; w.document.write(`<html><head><title>Z-Report ${z.date}</title><style>@page{margin:4mm}body{font-family:'Courier New',monospace;font-size:11px;width:268px;margin:0 auto;padding:6px;color:#000;line-height:1.5}.c{text-align:center}.b{font-weight:bold}.hr{border-top:1px dashed #000;margin:5px 0}.r{display:flex;justify-content:space-between;margin:1px 0}.big{font-size:14px}</style></head><body><div class="c b big">${ST.store_name}</div><div class="c">LAPORAN PENUTUPAN KASIR</div><div class=hr></div><div class=r><span>Tanggal</span><span>${z.date}</span></div><div class=r><span>Kasir</span><span>${user?.username||'-'}</span></div><div class=r><span>Jml Transaksi</span><span>${z.count}</span></div><div class=hr></div><div class="r b"><span>Total Penjualan</span><span>${rp(z.sales)}</span></div><div class=r><span>HPP</span><span>-${rp(z.hpp)}</span></div><div class=r><span>Biaya Admin</span><span>-${rp(z.fee)}</span></div><div class="r b big"><span>LABA BERSIH</span><span>${rp(z.profit)}</span></div><div class=hr></div><div class="b">Rincian per Metode</div>${rows}<div class=hr></div><div class="c">— Ditutup pada ${new Date().toLocaleString('id-ID')} —</div></body></html>`); w.document.close(); w.focus(); setTimeout(()=>w.print(),350) }
+
+  const printStruk=t=>{ const logo=ST.logo_struk_url?`<div class="c"><img src="${ST.logo_struk_url}" style="max-width:120px;max-height:60px"/></div>`:`<div class="c b big">${ST.store_name}</div>`; const rows=(t.transaction_items||[]).map(i=>`<div class=r><span>${i.product_name}${i.qty>1?' x'+i.qty:''}${i.imei?'<br><small>'+i.imei+'</small>':''}</span><span>${rp(i.line_total)}</span></div>`).join(''); const ps=(t.payments||[]).map(p=>`<div class=r><span>Bayar (${p.method_name})</span><span>${rp(p.amount)}</span></div>`).join(''); const w=window.open('','_blank','width=380,height=680'); if(!w)return; w.document.write(`<html><head><title>${t.invoice_no||'Struk'}</title><style>@page{margin:4mm}body{font-family:'Courier New',monospace;font-size:11px;width:268px;margin:0 auto;padding:6px;color:#000;line-height:1.5}.c{text-align:center}.b{font-weight:bold}.hr{border-top:1px dashed #000;margin:5px 0}.r{display:flex;justify-content:space-between;gap:8px;margin:1px 0}.r span:last-child{white-space:nowrap;text-align:right}small{font-size:9px;color:#444}.big{font-size:15px}</style></head><body>${logo}<div class="c small">${ST.address||''}</div><div class=hr></div><div class=r><span>No</span><span>${t.invoice_no||t.id.slice(0,8)}</span></div><div class=r><span>Tgl</span><span>${new Date(t.created_at).toLocaleString('id-ID')}</span></div><div class=r><span>Kasir</span><span>${t.cashier_name||'-'}</span></div><div class=r><span>Pelanggan</span><span>${t.customer_name||'Umum'}</span></div><div class=hr></div>${rows}<div class=hr></div><div class="r b big"><span>Total</span><span>${rp(t.total_amount)}</span></div>${ps}<div class=hr></div><div class="c b small">${ST.struk_footer||''}</div></body></html>`); w.document.close(); w.focus(); setTimeout(()=>w.print(),350) }
+
   if(load) return <div className="p-8 flex justify-center"><div className="w-8 h-8 border-4 border-[#0058A3] border-t-transparent rounded-full animate-spin"/></div>
+  const statusBadge = s => s==='paid'?'bg-green-100 text-green-700':s==='void'?'bg-gray-200 text-gray-600':'bg-red-100 text-red-700'
+
   return (
     <div className="p-6 lg:p-8">
-      <div className="mb-4 relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Cari customer / nama produk / no invoice..." className="w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#0058A3] outline-none"/></div>
+      <div className="flex justify-between items-center mb-4 flex-wrap gap-3">
+        <div><h2 className="text-2xl font-bold text-gray-900">Riwayat Transaksi</h2><p className="text-sm text-gray-500 mt-0.5">CRUD, retur & penutupan kasir</p></div>
+        <button onClick={bukaZ} className="flex items-center gap-2 px-4 py-2 bg-[#0058A3] text-white rounded-lg hover:bg-[#004080] shadow-sm text-sm font-medium"><Lock className="w-4 h-4"/>Tutup Kasir (Z-Report)</button>
+      </div>
+      {/* FILTER TANGGAL */}
+      <div className="bg-white border rounded-xl p-3 mb-4 flex items-center gap-2 flex-wrap">
+        <Calendar className="w-4 h-4 text-gray-400"/>
+        <input type="date" value={from} onChange={e=>setFrom(e.target.value)} className="text-sm border rounded px-2 py-1.5 outline-none focus:ring-2 focus:ring-[#0058A3]"/>
+        <span className="text-gray-400">s/d</span>
+        <input type="date" value={to} onChange={e=>setTo(e.target.value)} className="text-sm border rounded px-2 py-1.5 outline-none focus:ring-2 focus:ring-[#0058A3]"/>
+        <button onClick={()=>{setFrom(today());setTo(today())}} className="px-3 py-1.5 bg-gray-100 rounded-lg text-xs font-medium hover:bg-gray-200">Hari Ini</button>
+        <button onClick={()=>{setFrom(format(startOfMonth(new Date()),'yyyy-MM-dd'));setTo(today())}} className="px-3 py-1.5 bg-gray-100 rounded-lg text-xs font-medium hover:bg-gray-200">Bulan Ini</button>
+        <button onClick={()=>{setFrom(format(subDays(new Date(),6),'yyyy-MM-dd'));setTo(today())}} className="px-3 py-1.5 bg-gray-100 rounded-lg text-xs font-medium hover:bg-gray-200">7 Hari</button>
+        <div className="flex-1 min-w-[180px] relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Cari customer / produk / IMEI / invoice..." className="w-full pl-9 pr-3 py-1.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#0058A3]"/></div>
+      </div>
+
       <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
         <table className="w-full"><thead><tr className="bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase"><th className="text-left p-3">Tanggal</th><th className="text-left p-3">Customer</th><th className="text-left p-3">Produk</th><th className="text-left p-3">Total</th><th className="text-left p-3">Status</th><th className="text-right p-3">Aksi</th></tr></thead>
           <tbody className="divide-y">{f.map(t=>(<tr key={t.id} className="hover:bg-gray-50">
@@ -31,21 +87,53 @@ export default function Riwayat() {
             <td className="p-3 text-sm font-medium text-gray-900">{t.customer_name||'Umum'}</td>
             <td className="p-3 text-sm text-gray-700 max-w-[280px]"><div className="flex items-center gap-2"><Package className="w-4 h-4 text-gray-400 flex-shrink-0"/><span className="truncate">{ringkasProduk(t)}</span></div></td>
             <td className="p-3 text-sm font-bold text-[#0058A3] whitespace-nowrap">{rp(t.total_amount)}</td>
-            <td className="p-3"><span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">{t.payment_status?.toUpperCase()}</span></td>
-            <td className="p-3 text-right"><button onClick={()=>open(t.id)} className="p-1.5 hover:bg-blue-50 rounded text-[#0058A3]" title="Lihat detail"><Eye className="w-4 h-4"/></button></td>
-          </tr>))}{!f.length&&<tr><td colSpan={6} className="p-12 text-center text-gray-400">Belum ada transaksi</td></tr>}</tbody></table>
+            <td className="p-3"><span className={`px-2 py-0.5 rounded text-xs font-medium ${statusBadge(t.payment_status)}`}>{t.payment_status?.toUpperCase()}</span></td>
+            <td className="p-3 text-right"><div className="flex justify-end gap-1">
+              <button onClick={()=>open(t.id)} className="p-1.5 hover:bg-blue-50 rounded text-[#0058A3]" title="Detail"><Eye className="w-4 h-4"/></button>
+              <button onClick={()=>startEdit(t)} className="p-1.5 hover:bg-amber-50 rounded text-amber-600" title="Edit / Retur"><Edit2 className="w-4 h-4"/></button>
+              <button onClick={()=>hapus(t)} className="p-1.5 hover:bg-red-50 rounded text-red-600" title="Hapus (stok kembali)"><Trash2 className="w-4 h-4"/></button>
+            </div></td>
+          </tr>))}{!f.length&&<tr><td colSpan={6} className="p-12 text-center text-gray-400">Tidak ada transaksi pada periode ini</td></tr>}</tbody></table>
       </div>
+      <p className="mt-3 text-sm text-gray-500">{f.length} transaksi · periode {from} s/d {to}</p>
+
+      {/* DETAIL */}
       {det&&<div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in"><div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center p-5 border-b sticky top-0 bg-white"><h3 className="font-bold">Detail Transaksi <span className="font-mono text-xs text-gray-400 ml-1">{det.invoice_no||det.id.slice(0,8)}</span></h3><button onClick={()=>setDet(null)} className="p-1 hover:bg-gray-100 rounded"><X className="w-5 h-5"/></button></div>
+        <div className="flex justify-between items-center p-5 border-b sticky top-0 bg-white"><h3 className="font-bold">Detail <span className="font-mono text-xs text-gray-400 ml-1">{det.invoice_no||det.id.slice(0,8)}</span></h3><button onClick={()=>setDet(null)} className="p-1 hover:bg-gray-100 rounded"><X className="w-5 h-5"/></button></div>
         <div className="p-5 space-y-4 text-sm">
-          <div className="grid grid-cols-2 gap-2"><Info l="Customer" v={det.customer_name}/><Info l="Tanggal" v={new Date(det.created_at).toLocaleString('id-ID')}/><Info l="Kasir" v={det.cashier_name}/><Info l="Garansi" v={det.warranty_type!=='none'?det.warranty_months+' bulan':'Tidak'}/></div>
-          <div><p className="font-semibold mb-2">Item</p>{(det.transaction_items||[]).map(i=>(<div key={i.id} className="flex justify-between py-1 border-b border-gray-100"><span>{i.product_name} x{i.qty}{i.imei&&<span className="block text-[10px] font-mono text-gray-400">{i.imei}</span>}</span><span className="font-medium">{rp(i.line_total)}</span></div>))}</div>
+          <div className="grid grid-cols-2 gap-2"><Info l="Customer" v={det.customer_name}/><Info l="Tanggal" v={new Date(det.created_at).toLocaleString('id-ID')}/><Info l="Kasir" v={det.cashier_name}/><Info l="Status" v={det.payment_status}/><Info l="Garansi" v={det.warranty_type!=='none'?det.warranty_months+' bulan':'Tidak'}/><Info l="Telp" v={det.customer_phone}/></div>
+          <div><p className="font-semibold mb-2">Item</p>{(det.transaction_items||[]).map(i=>(<div key={i.id} className="flex justify-between py-1 border-b border-gray-100"><span>{i.product_name} x{i.qty}{i.imei&&<span className="block text-[10px] font-mono text-gray-400">{i.imei}</span>}{i.is_consignment&&<span className="block text-[10px] text-amber-600">Konsinyasi · bagi {i.split_percent}%</span>}</span><span className="font-medium">{rp(i.line_total)}</span></div>))}</div>
           {det.trade_ins?.length>0&&<div><p className="font-semibold mb-1">Tukar Tambah</p>{det.trade_ins.map(t=>(<div key={t.id} className="flex justify-between text-gray-600"><span>{t.device_name}</span><span>-{rp(t.trade_in_value)}</span></div>))}</div>}
+          {det.consignment_settlements?.length>0&&<div className="bg-amber-50 border border-amber-200 rounded p-3"><p className="font-semibold text-amber-800 mb-1">Bagi Hasil Konsinyasi</p>{det.consignment_settlements.map(s=>(<div key={s.id} className="flex justify-between text-xs text-amber-900"><span>{s.product_name}</span><span>Owner {rp(s.owner_share)} · Toko {rp(s.store_share)}</span></div>))}</div>}
           <div><p className="font-semibold mb-2">Pembayaran</p>{(det.payments||[]).map(p=>(<div key={p.id} className="flex justify-between py-1"><span>{p.method_name}</span><span>{rp(p.amount)} {p.admin_fee>0&&<span className="text-xs text-red-500">(fee {rp(p.admin_fee)})</span>}</span></div>))}</div>
           <div className="flex justify-between pt-3 border-t-2 border-[#0058A3] text-base font-bold"><span>TOTAL</span><span className="text-[#0058A3]">{rp(det.total_amount)}</span></div>
-          <button onClick={()=>print(det)} className="w-full bg-[#0058A3] text-white rounded-lg py-2.5 font-medium flex items-center justify-center gap-2 hover:bg-[#004080] transition-colors"><Printer className="w-4 h-4"/>Cetak Ulang Struk</button>
+          <button onClick={()=>printStruk(det)} className="w-full bg-[#0058A3] text-white rounded-lg py-2.5 font-medium flex items-center justify-center gap-2 hover:bg-[#004080]"><Printer className="w-4 h-4"/>Cetak Ulang Struk</button>
+        </div>
+      </div></div>}
+
+      {/* EDIT / RETUR */}
+      {editTx&&<div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in"><div className="bg-white rounded-xl shadow-2xl w-full max-w-md"><div className="flex justify-between items-center p-5 border-b"><h3 className="font-bold">Edit / Retur Transaksi</h3><button onClick={()=>setEditTx(null)} className="p-1 hover:bg-gray-100 rounded"><X className="w-5 h-5"/></button></div>
+        <div className="p-5 space-y-3">
+          <p className="text-xs text-gray-500 bg-gray-50 rounded p-2">Ubah data pelanggan/notes, atau tandai <b>Void/Refunded</b> untuk transaksi gagal — stok otomatis dikembalikan.</p>
+          <div><label className="text-xs text-gray-500">Nama Customer</label><input value={editForm.customer_name} onChange={e=>setEditForm({...editForm,customer_name:e.target.value})} className="w-full border rounded px-3 py-2 text-sm mt-1 outline-none focus:ring-2 focus:ring-[#0058A3]"/></div>
+          <div><label className="text-xs text-gray-500">No. HP</label><input value={editForm.customer_phone} onChange={e=>setEditForm({...editForm,customer_phone:e.target.value})} className="w-full border rounded px-3 py-2 text-sm mt-1 outline-none focus:ring-2 focus:ring-[#0058A3]"/></div>
+          <div><label className="text-xs text-gray-500">Catatan</label><textarea value={editForm.notes} onChange={e=>setEditForm({...editForm,notes:e.target.value})} rows={2} className="w-full border rounded px-3 py-2 text-sm mt-1 outline-none focus:ring-2 focus:ring-[#0058A3]"/></div>
+          <div><label className="text-xs text-gray-500">Status Pembayaran</label><select value={editForm.payment_status} onChange={e=>setEditForm({...editForm,payment_status:e.target.value})} className="w-full border rounded px-3 py-2 text-sm mt-1 bg-white"><option value="paid">Paid (lunas)</option><option value="void">Void (dibatalkan → stok kembali)</option><option value="refunded">Refunded (dikembalikan → stok kembali)</option></select></div>
+          <button onClick={saveEdit} className="w-full py-2.5 bg-[#0058A3] text-white rounded-lg font-medium flex items-center justify-center gap-2"><Edit2 className="w-4 h-4"/>Simpan Perubahan</button>
+        </div>
+      </div></div>}
+
+      {/* Z-REPORT */}
+      {zreport&&<div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in"><div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"><div className="flex justify-between items-center p-5 border-b sticky top-0 bg-white"><h3 className="font-bold">Tutup Kasir — {zreport.date}</h3><button onClick={()=>setZreport(null)} className="p-1 hover:bg-gray-100 rounded"><X className="w-5 h-5"/></button></div>
+        <div className="p-5 space-y-3 text-sm">
+          {zreport.already&&!zreport.saved&&<div className="bg-amber-50 border border-amber-200 text-amber-800 rounded p-2 text-xs">Hari ini sudah pernah ditutup. Menekan "Tutup Kasir" akan menimpa data lama.</div>}
+          {zreport.saved&&<div className="bg-green-50 border border-green-200 text-green-700 rounded p-2 text-xs font-medium">✓ Kasir {zreport.date} berhasil ditutup & tersimpan.</div>}
+          <div className="grid grid-cols-2 gap-2"><Info l="Jml Transaksi" v={zreport.count}/><Info l="Total Penjualan" v={rp(zreport.sales)}/><Info l="HPP" v={rp(zreport.hpp)}/><Info l="Biaya Admin" v={rp(zreport.fee)}/></div>
+          <div className="bg-blue-50 rounded-lg p-3 flex justify-between items-center"><span className="font-semibold text-[#0058A3]">LABA BERSIH HARI INI</span><span className="text-xl font-bold text-[#0058A3]">{rp(zreport.profit)}</span></div>
+          <div><p className="font-semibold mb-1">Rincian per Metode</p>{Object.entries(zreport.breakdown||{}).map(([m,a])=>(<div key={m} className="flex justify-between py-1 border-b border-gray-100"><span>{m}</span><span className="font-medium">{rp(a)}</span></div>))}{!Object.keys(zreport.breakdown||{}).length&&<p className="text-gray-400 text-xs">Tidak ada transaksi paid pada periode ini.</p>}</div>
+          <div className="flex gap-2 pt-2"><button onClick={printZ} className="flex-1 border border-gray-300 rounded-lg py-2.5 font-medium flex items-center justify-center gap-2 hover:bg-gray-50"><Printer className="w-4 h-4"/>Cetak</button><button onClick={tutupKasir} disabled={closing} className="flex-1 bg-[#0058A3] text-white rounded-lg py-2.5 font-medium flex items-center justify-center gap-2 hover:bg-[#004080] disabled:opacity-50">{closing?'Menyimpan...':<><Lock className="w-4 h-4"/>Tutup Kasir</>}</button></div>
         </div>
       </div></div>}
     </div> )
 }
-function Info({l,v}){return <div className="bg-gray-50 rounded p-2"><p className="text-xs text-gray-500">{l}</p><p className="font-medium">{v||'—'}</p></div>}
+function Info({l,v}){return <div className="bg-gray-50 rounded p-2"><p className="text-xs text-gray-500">{l}</p><p className="font-medium">{v??'—'}</p></div>}
