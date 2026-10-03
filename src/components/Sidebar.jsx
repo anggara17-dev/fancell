@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useStoreSettings } from '../lib/useStoreSettings'
-import { LayoutDashboard, ShoppingCart, Package, History, FileText, Wallet, Settings, ShieldCheck, ChevronLeft, ChevronRight, ChevronDown, LogOut, Zap, CreditCard, Printer } from 'lucide-react'
+import { LayoutDashboard, ShoppingCart, Package, History, FileText, Wallet, Settings, ShieldCheck, Repeat, ChevronLeft, ChevronRight, ChevronDown, LogOut, Zap, CreditCard, Printer } from 'lucide-react'
 export default function Sidebar({ currentPage, setCurrentPage }) {
   const { user, role, logout } = useAuth(); const ST = useStoreSettings()
   const [collapsed, setCollapsed] = useState(false); const [userMenuOpen, setUserMenuOpen] = useState(false); const [kasirOpen, setKasirOpen] = useState(true); const ref = useRef(null)
@@ -11,6 +11,7 @@ export default function Sidebar({ currentPage, setCurrentPage }) {
     { id:'kasir-group', label:'Kasir / POS', icon:ShoppingCart, roles:['owner','kasir'], children:[ {id:'kasir',label:'POS Kasir',icon:ShoppingCart}, {id:'metode-bayar',label:'Metode Bayar',icon:CreditCard}, {id:'cetak',label:'Cetak / Printer',icon:Printer} ] },
     { id:'barang', label:'Master Barang', icon:Package, roles:['owner','kasir','gudang'] },
     { id:'riwayat', label:'Riwayat Transaksi', icon:History, roles:['owner','kasir'] },
+    { id:'konsinyasi', label:'Konsinyasi', icon:Repeat, roles:['owner','kasir'] },
     { id:'garansi', label:'Garansi', icon:ShieldCheck, roles:['owner','kasir'] },
     { id:'laba-rugi', label:'Laba Rugi', icon:FileText, roles:['owner'] },
     { id:'modal', label:'Keuntungan & Modal', icon:Wallet, roles:['owner'] },
