@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { Confirm, Modal, RupiahInput, useToast, rp } from '../components/ui'
 import { Plus, Edit2, Trash2, Check, Package, Search, Upload, ImageIcon, Percent, Tags, Users } from 'lucide-react'
-const emptyVariant = () => ({ storage:'', color:'', harga_jual:0, hpp:0, stock_qty:0, imeis:'' })
+const emptyVariant = () => ({ id: null, storage:'', color:'', harga_jual:0, hpp:0, stock_qty:0, imeis:'' })
 const emptyForm = () => ({ name:'', category:'Aksesoris', stock_type:'qty', type:'new', brand:'', model:'', status:'active', image_url:'', consignment_owner_id:'', consignment_split:80, variants:[emptyVariant()] })
 export default function MasterBarang() {
   const toast = useToast()
   const [rows, setRows] = useState([]); const [cats, setCats] = useState([]); const [owners, setOwners] = useState([]); const [allVariants, setAllVariants] = useState([])
   const [loading, setLoading] = useState(true); const [q, setQ] = useState('')
   const [showForm, setShowForm] = useState(false); const [editing, setEditing] = useState(null); const [fd, setFd] = useState(emptyForm())
+  const [orig, setOrig] = useState(null) // { variants:[{id,...}], imeisByVariant:{id:[{id,imei,status}]} }
   const [photoFile, setPhotoFile] = useState(null); const [photoPreview, setPhotoPreview] = useState('')
   const [showCat, setShowCat] = useState(false); const [newCat, setNewCat] = useState({ name:'', stock_type:'qty' })
   const [showOwner, setShowOwner] = useState(false); const [newOwner, setNewOwner] = useState({ name:'', phone:'', address:'' })
@@ -16,7 +17,7 @@ export default function MasterBarang() {
   const [cf, setCf] = useState(null); const ask = (message, action) => setCf({ message, action })
   useEffect(() => { load() }, [])
   async function load() {
-    const [p, v, i, c, o] = await Promise.all([ supabase.from('products').select('*').eq('status','active').order('name'), supabase.from('product_variants').select('*'), supabase.from('product_imeis').select('variant_id,status'), supabase.from('categories').select('*').order('sort'), supabase.from('consignment_owners').select('*').order('name') ])
+    const [p, v, i, c, o] = await Promise.all([ supabase.from('products').select('*').eq('status','active').order('name'), supabase.from('product_variants').select('*'), supabase.from('product_imeis').select('id,variant_id,imei,status'), supabase.from('categories').select('*').order('sort'), supabase.from('consignment_owners').select('*').order('name') ])
     setCats(c.data || []); setOwners(o.data || [])
     const byProd = {}, avByVar = {}, flat = [], pmap = {}
     ;(v.data || []).forEach(x => { (byProd[x.product_id] = byProd[x.product_id] || []).push(x); flat.push(x) })
@@ -41,19 +42,49 @@ export default function MasterBarang() {
       let pid
       if (editing) { const { data, error } = await supabase.from('products').update(payload).eq('id', editing.id).select().single(); if (error) throw error; pid = data.id }
       else { const { data, error } = await supabase.from('products').insert(payload).select().single(); if (error) throw error; pid = data.id }
-      await supabase.from('product_variants').delete().eq('product_id', pid)
-      for (const v of fd.variants) { const isImei = fd.stock_type === 'imei'; const { data: varRow, error: e2 } = await supabase.from('product_variants').insert({ product_id: pid, storage: v.storage || null, color: v.color || null, harga_jual: +v.harga_jual || 0, hpp: +v.hpp || 0, stock_qty: isImei ? 0 : (+v.stock_qty || 0) }).select().single(); if (e2) throw e2; if (isImei && v.imeis) { const arr = v.imeis.split('\n').map(s => s.trim()).filter(Boolean); if (arr.length) await supabase.from('product_imeis').insert(arr.map(im => ({ variant_id: varRow.id, imei: im, status: 'available' }))) } }
-      toast.success(editing ? 'Produk diperbarui' : 'Produk ditambahkan'); setShowForm(false); setEditing(null); setFd(emptyForm()); setPhotoFile(null); setPhotoPreview(''); load()
+      const isImei = fd.stock_type === 'imei'
+      if (editing && orig) {
+        // REKONSILIASI: jangan hapus buta. Pertahankan IMEI sold.
+        const origIds = new Set(orig.variants.map(v => v.id))
+        const formIds = new Set(fd.variants.filter(v => v.id).map(v => v.id))
+        for (const id of origIds) if (!formIds.has(id)) await supabase.from('product_variants').delete().eq('id', id)
+        for (const v of fd.variants) {
+          const fields = { storage: v.storage || null, color: v.color || null, harga_jual: +v.harga_jual || 0, hpp: +v.hpp || 0, stock_qty: isImei ? 0 : (+v.stock_qty || 0) }
+          if (v.id) {
+            await supabase.from('product_variants').update(fields).eq('id', v.id)
+            const desired = (v.imeis || '').split('\n').map(s => s.trim()).filter(Boolean)
+            const existing = orig.imeisByVariant[v.id] || []
+            const existingSet = new Set(existing.map(e => e.imei))
+            const toDel = existing.filter(e => e.status === 'available' && !desired.includes(e.imei)).map(e => e.id)
+            if (toDel.length) await supabase.from('product_imeis').delete().in('id', toDel)
+            const toAdd = desired.filter(d => !existingSet.has(d))
+            if (toAdd.length) await supabase.from('product_imeis').insert(toAdd.map(im => ({ variant_id: v.id, imei: im, status: 'available' })))
+          } else {
+            const { data: vr, error: e2 } = await supabase.from('product_variants').insert({ product_id: pid, ...fields }).select().single(); if (e2) throw e2
+            const desired = (v.imeis || '').split('\n').map(s => s.trim()).filter(Boolean)
+            if (isImei && desired.length) await supabase.from('product_imeis').insert(desired.map(im => ({ variant_id: vr.id, imei: im, status: 'available' })))
+          }
+        }
+      } else {
+        await supabase.from('product_variants').delete().eq('product_id', pid)
+        for (const v of fd.variants) {
+          const { data: vr, error: e2 } = await supabase.from('product_variants').insert({ product_id: pid, storage: v.storage || null, color: v.color || null, harga_jual: +v.harga_jual || 0, hpp: +v.hpp || 0, stock_qty: isImei ? 0 : (+v.stock_qty || 0) }).select().single(); if (e2) throw e2
+          if (isImei && v.imeis) { const arr = v.imeis.split('\n').map(s => s.trim()).filter(Boolean); if (arr.length) await supabase.from('product_imeis').insert(arr.map(im => ({ variant_id: vr.id, imei: im, status: 'available' }))) }
+        }
+      }
+      toast.success(editing ? 'Produk diperbarui' : 'Produk ditambahkan'); setShowForm(false); setEditing(null); setOrig(null); setFd(emptyForm()); setPhotoFile(null); setPhotoPreview(''); load()
     } catch (err) { toast.error(err.message) }
   }
   async function del(id) { ask('Hapus produk ini beserta varian & stoknya?', async () => { const { error } = await supabase.from('products').delete().eq('id', id); if (error) toast.error(error.message); else toast.success('Produk dihapus'); load() }) }
   async function edit(prod) {
-    const [vs, ims] = await Promise.all([ supabase.from('product_variants').select('*').eq('product_id', prod.id), supabase.from('product_imeis').select('variant_id,imei,status').eq('status','available') ])
-    const avMap = {}; (ims.data || []).forEach(x => { (avMap[x.variant_id] = avMap[x.variant_id] || []).push(x.imei) })
-    setEditing(prod); setFd({ name: prod.name, category: prod.category, stock_type: prod.stock_type, type: prod.type, brand: prod.brand || '', model: prod.model || '', status: prod.status || 'active', image_url: prod.image_url || '', consignment_owner_id: prod.consignment_owner_id || '', consignment_split: prod.consignment_split ?? 80, variants: (vs.data || []).map(v => ({ storage: v.storage || '', color: v.color || '', harga_jual: v.harga_jual || 0, hpp: v.hpp || 0, stock_qty: v.stock_qty || 0, imeis: (avMap[v.id] || []).join('\n') })) })
+    const [vs, ims] = await Promise.all([ supabase.from('product_variants').select('*').eq('product_id', prod.id), supabase.from('product_imeis').select('id,variant_id,imei,status').eq('variant_id', null).then(async () => supabase.from('product_imeis').select('id,variant_id,imei,status')) ])
+    const imeisByVariant = {}; (ims.data || []).forEach(x => { (imeisByVariant[x.variant_id] = imeisByVariant[x.variant_id] || []).push(x) })
+    setEditing(prod); setOrig({ variants: vs.data || [], imeisByVariant })
+    setFd({ name: prod.name, category: prod.category, stock_type: prod.stock_type, type: prod.type, brand: prod.brand || '', model: prod.model || '', status: prod.status || 'active', image_url: prod.image_url || '', consignment_owner_id: prod.consignment_owner_id || '', consignment_split: prod.consignment_split ?? 80,
+      variants: (vs.data || []).map(v => ({ id: v.id, storage: v.storage || '', color: v.color || '', harga_jual: v.harga_jual || 0, hpp: v.hpp || 0, stock_qty: v.stock_qty || 0, imeis: ((imeisByVariant[v.id] || []).filter(e => e.status === 'available').map(e => e.imei)).join('\n') })) })
     setPhotoFile(null); setPhotoPreview(prod.image_url || ''); setShowForm(true)
   }
-  function add() { setEditing(null); setFd(emptyForm()); setPhotoFile(null); setPhotoPreview(''); setShowForm(true) }
+  function add() { setEditing(null); setOrig(null); setFd(emptyForm()); setPhotoFile(null); setPhotoPreview(''); setShowForm(true) }
   async function addCat() { if (!newCat.name.trim()) return; const { error } = await supabase.from('categories').insert({ name: newCat.name.trim(), stock_type: newCat.stock_type }); if (error) toast.error(error.message); else { toast.success('Kategori ditambahkan'); setNewCat({ name:'', stock_type:'qty' }); load() } }
   function delCat(id, name) { ask(`Hapus kategori "${name}"? Produk yang memakainya tetap tersimpan.`, async () => { await supabase.from('categories').delete().eq('id', id); toast.success('Kategori dihapus'); load() }) }
   async function addOwner() { if (!newOwner.name.trim()) return; const { error } = await supabase.from('consignment_owners').insert({ name: newOwner.name.trim(), phone: newOwner.phone, address: newOwner.address }); if (error) toast.error(error.message); else { toast.success('Pemilik titipan ditambahkan'); setNewOwner({ name:'', phone:'', address:'' }); load() } }
@@ -102,7 +133,7 @@ export default function MasterBarang() {
             <div className="flex justify-between items-center mb-3"><h4 className="font-semibold text-gray-900">Varian {fd.stock_type === 'imei' ? '(setiap varian = daftar IMEI unit)' : '(stok per varian)'}</h4><button type="button" onClick={addVariant} className="text-sm text-[#0058A3] font-medium flex items-center gap-1"><Plus className="w-4 h-4"/>Tambah Varian</button></div>
             <div className="space-y-3">{fd.variants.map((v, idx) => (
               <div key={idx} className="border border-gray-200 rounded-lg p-3 bg-gray-50/50">
-                <div className="flex justify-between items-center mb-2"><span className="text-xs font-semibold text-gray-500">Varian #{idx + 1}</span>{fd.variants.length > 1 && <button type="button" onClick={() => rmVariant(idx)} className="text-red-500 hover:bg-red-50 p-1 rounded"><Trash2 className="w-4 h-4"/></button>}</div>
+                <div className="flex justify-between items-center mb-2"><span className="text-xs font-semibold text-gray-500">Varian #{idx + 1}{v.id ? ' (tersimpan)' : ''}</span>{fd.variants.length > 1 && <button type="button" onClick={() => rmVariant(idx)} className="text-red-500 hover:bg-red-50 p-1 rounded"><Trash2 className="w-4 h-4"/></button>}</div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   <input value={v.storage} onChange={e => setVariant(idx, 'storage', e.target.value)} placeholder="Storage" className="px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#0058A3]"/>
                   <input value={v.color} onChange={e => setVariant(idx, 'color', e.target.value)} placeholder="Warna" className="px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#0058A3]"/>
@@ -110,7 +141,7 @@ export default function MasterBarang() {
                   <div><RupiahInput value={v.hpp} onChange={x => setVariant(idx, 'hpp', x)} className="w-full px-3 py-2 border rounded-lg text-sm text-right outline-none focus:ring-2 focus:ring-[#0058A3]" placeholder="HPP"/><span className="text-[10px] text-gray-400">HPP / Modal</span></div>
                   {fd.stock_type === 'qty' && <div className="col-span-2 md:col-span-1"><input type="number" value={v.stock_qty} onChange={e => setVariant(idx, 'stock_qty', e.target.value)} placeholder="Stok" className="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#0058A3]"/><span className="text-[10px] text-gray-400">Jumlah Stok</span></div>}
                 </div>
-                {fd.stock_type === 'imei' && <div className="mt-2"><textarea value={v.imeis} onChange={e => setVariant(idx, 'imeis', e.target.value)} rows={2} placeholder={"Satu IMEI per baris:\n356789012345671"} className="w-full px-3 py-2 border rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-[#0058A3]"/><span className="text-[10px] text-gray-400">1 baris = 1 unit. Terjual otomatis saat checkout POS.</span></div>}
+                {fd.stock_type === 'imei' && <div className="mt-2"><textarea value={v.imeis} onChange={e => setVariant(idx, 'imeis', e.target.value)} rows={2} placeholder={"Satu IMEI per baris:\n356789012345671"} className="w-full px-3 py-2 border rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-[#0058A3]"/><span className="text-[10px] text-gray-400">Hanya menampilkan unit TERSEDIA. Unit yang sudah TERJUAL otomatis dipertahankan saat simpan.</span></div>}
               </div>))}
             </div>
           </div>
