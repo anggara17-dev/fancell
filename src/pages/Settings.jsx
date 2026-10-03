@@ -30,11 +30,11 @@ function TabToko() {
       const urlSide = logoSide ? await upload(logoSide, 'logo-sidebar') : fd.logo_sidebar_url
       const urlStruk = logoStruk ? await upload(logoStruk, 'logo-struk') : fd.logo_struk_url
       const row = { id:1, store_name: fd.store_name || 'FANCELL', address: fd.address || '', whatsapp: fd.whatsapp || '', struk_footer: fd.struk_footer || '', logo_sidebar_url: urlSide || null, logo_struk_url: urlStruk || null, updated_at: new Date().toISOString() }
-      const { error } = await supabase.from('settings').upsert(row) // upsert = buat baris kalau belum ada
+      const { error } = await supabase.from('settings').upsert(row)
       if (error) throw error
       setFd({ ...fd, logo_sidebar_url: urlSide || null, logo_struk_url: urlStruk || null })
       setLogoSide(null); setLogoStruk(null)
-      invalidateSettings() // beri tahu sidebar & struk untuk refresh
+      invalidateSettings()
       toast.success('Pengaturan toko disimpan')
     } catch (err) { toast.error('Gagal simpan: ' + err.message) } finally { setSaving(false) }
   }
