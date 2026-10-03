@@ -4,6 +4,8 @@ import { Confirm, Modal, RupiahInput, useToast, rp } from '../components/ui'
 import { DollarSign, Package, TrendingUp, TrendingDown, Receipt, Percent, Plus, Trash2, Check } from 'lucide-react'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { id } from 'date-fns/locale'
+const isoFrom = d => new Date(d + 'T00:00:00').toISOString()
+const isoTo = d => new Date(d + 'T23:59:59.999').toISOString()
 export default function LabaRugi() {
   const toast = useToast()
   const [from, setFrom] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'))
@@ -15,7 +17,7 @@ export default function LabaRugi() {
   useEffect(() => { run() }, [from, to])
   async function run() {
     setLoad(true)
-    const [tx, op] = await Promise.all([ supabase.from('transactions').select('total_amount, transaction_items(hpp_at_sale,qty), payments(admin_fee)').gte('created_at', from).lte('created_at', to + 'T23:59:59').eq('payment_status', 'paid'), supabase.from('operational_costs').select('*').gte('date', from).lte(to).order('date', { ascending: false }) ])
+    const [tx, op] = await Promise.all([ supabase.from('transactions').select('total_amount, transaction_items(hpp_at_sale,qty), payments(admin_fee)').gte('created_at', isoFrom(from)).lte('created_at', isoTo(to)).eq('payment_status', 'paid'), supabase.from('operational_costs').select('*').gte('date', from).lte(to).order('date', { ascending: false }) ])
     let rev = 0, hpp = 0, fee = 0
     ;(tx.data || []).forEach(t => { rev += +t.total_amount || 0; (t.transaction_items || []).forEach(i => hpp += (+i.hpp_at_sale || 0) * (i.qty || 1)); (t.payments || []).forEach(p => fee += +p.admin_fee || 0) })
     const list = op.data || []; const opex = list.reduce((a, c) => a + (+c.amount || 0), 0); const gross = rev - hpp
@@ -28,7 +30,7 @@ export default function LabaRugi() {
   return (
     <div className="p-6 lg:p-8">
       <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
-        <div><h2 className="text-2xl font-bold">Laba Rugi</h2><p className="text-sm text-gray-500 mt-0.5">{format(new Date(from), 'dd MMM yyyy', { locale: id })} — {format(new Date(to), 'dd MMM yyyy', { locale: id })}</p></div>
+        <div><h2 className="text-2xl font-bold">Laba Rugi</h2><p className="text-sm text-gray-500 mt-0.5">{format(new Date(from + 'T00:00:00'), 'dd MMM yyyy', { locale: id })} — {format(new Date(to + 'T00:00:00'), 'dd MMM yyyy', { locale: id })}</p></div>
         <div className="flex items-center gap-2 bg-gray-50 border rounded-lg p-1"><input type="date" value={from} onChange={e => setFrom(e.target.value)} className="text-sm bg-transparent px-2 outline-none"/><span className="text-gray-400">-</span><input type="date" value={to} onChange={e => setTo(e.target.value)} className="text-sm bg-transparent px-2 outline-none"/></div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -54,7 +56,7 @@ export default function LabaRugi() {
           <div className="p-4 overflow-y-auto max-h-[420px] flex-1">
             {!opexList.length ? <p className="text-center text-gray-400 text-sm py-10">Belum ada pengeluaran pada periode ini.</p> :
             <div className="space-y-2">{opexList.map(c => (<div key={c.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-              <div className="min-w-0"><p className="text-sm font-medium text-gray-900 truncate">{c.category}</p><p className="text-xs text-gray-500 truncate">{c.description || '—'} · {new Date(c.date).toLocaleDateString('id-ID')}</p></div>
+              <div className="min-w-0"><p className="text-sm font-medium text-gray-900 truncate">{c.category}</p><p className="text-xs text-gray-500 truncate">{c.description || '—'} · {new Date(c.date + 'T00:00:00').toLocaleDateString('id-ID')}</p></div>
               <div className="flex items-center gap-2 flex-shrink-0"><span className="text-sm font-bold text-red-600">-{rp(c.amount)}</span><button onClick={() => delOpex(c.id)} className="p-1.5 hover:bg-red-100 rounded text-red-600"><Trash2 className="w-4 h-4"/></button></div>
             </div>))}</div>}
           </div>
