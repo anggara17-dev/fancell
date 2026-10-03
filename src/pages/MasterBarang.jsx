@@ -9,7 +9,7 @@ export default function MasterBarang() {
   const [rows, setRows] = useState([]); const [cats, setCats] = useState([]); const [owners, setOwners] = useState([]); const [allVariants, setAllVariants] = useState([])
   const [loading, setLoading] = useState(true); const [q, setQ] = useState('')
   const [showForm, setShowForm] = useState(false); const [editing, setEditing] = useState(null); const [fd, setFd] = useState(emptyForm())
-  const [orig, setOrig] = useState(null) // { variants:[{id,...}], imeisByVariant:{id:[{id,imei,status}]} }
+  const [orig, setOrig] = useState(null)
   const [photoFile, setPhotoFile] = useState(null); const [photoPreview, setPhotoPreview] = useState('')
   const [showCat, setShowCat] = useState(false); const [newCat, setNewCat] = useState({ name:'', stock_type:'qty' })
   const [showOwner, setShowOwner] = useState(false); const [newOwner, setNewOwner] = useState({ name:'', phone:'', address:'' })
@@ -44,7 +44,6 @@ export default function MasterBarang() {
       else { const { data, error } = await supabase.from('products').insert(payload).select().single(); if (error) throw error; pid = data.id }
       const isImei = fd.stock_type === 'imei'
       if (editing && orig) {
-        // REKONSILIASI: jangan hapus buta. Pertahankan IMEI sold.
         const origIds = new Set(orig.variants.map(v => v.id))
         const formIds = new Set(fd.variants.filter(v => v.id).map(v => v.id))
         for (const id of origIds) if (!formIds.has(id)) await supabase.from('product_variants').delete().eq('id', id)
@@ -77,7 +76,7 @@ export default function MasterBarang() {
   }
   async function del(id) { ask('Hapus produk ini beserta varian & stoknya?', async () => { const { error } = await supabase.from('products').delete().eq('id', id); if (error) toast.error(error.message); else toast.success('Produk dihapus'); load() }) }
   async function edit(prod) {
-    const [vs, ims] = await Promise.all([ supabase.from('product_variants').select('*').eq('product_id', prod.id), supabase.from('product_imeis').select('id,variant_id,imei,status').eq('variant_id', null).then(async () => supabase.from('product_imeis').select('id,variant_id,imei,status')) ])
+    const [vs, ims] = await Promise.all([ supabase.from('product_variants').select('*').eq('product_id', prod.id), supabase.from('product_imeis').select('id,variant_id,imei,status') ])
     const imeisByVariant = {}; (ims.data || []).forEach(x => { (imeisByVariant[x.variant_id] = imeisByVariant[x.variant_id] || []).push(x) })
     setEditing(prod); setOrig({ variants: vs.data || [], imeisByVariant })
     setFd({ name: prod.name, category: prod.category, stock_type: prod.stock_type, type: prod.type, brand: prod.brand || '', model: prod.model || '', status: prod.status || 'active', image_url: prod.image_url || '', consignment_owner_id: prod.consignment_owner_id || '', consignment_split: prod.consignment_split ?? 80,
