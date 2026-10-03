@@ -18,12 +18,14 @@ export default function LabaRugi() {
   async function run() {
     setLoad(true)
     const [tx, op] = await Promise.all([ supabase.from('transactions').select('total_amount, transaction_items(hpp_at_sale,qty), payments(admin_fee)').gte('created_at', isoFrom(from)).lte('created_at', isoTo(to)).eq('payment_status', 'paid'), supabase.from('operational_costs').select('*').gte('date', from).lte(to).order('date', { ascending: false }) ])
+    if (tx.error) toast.error('Gagal ambil transaksi: ' + tx.error.message)
+    if (op.error) toast.error('Gagal ambil pengeluaran: ' + op.error.message + ' (jalankan SQL di chat bila tabel belum ada)')
     let rev = 0, hpp = 0, fee = 0
     ;(tx.data || []).forEach(t => { rev += +t.total_amount || 0; (t.transaction_items || []).forEach(i => hpp += (+i.hpp_at_sale || 0) * (i.qty || 1)); (t.payments || []).forEach(p => fee += +p.admin_fee || 0) })
     const list = op.data || []; const opex = list.reduce((a, c) => a + (+c.amount || 0), 0); const gross = rev - hpp
     setOpexList(list); setD({ rev, hpp, gross, fee, opex, net: gross - fee - opex }); setLoad(false)
   }
-  async function addOpex(e) { e.preventDefault(); if (!nf.category.trim() || !nf.amount) return toast.error('Kategori & nominal wajib diisi'); try { const { error } = await supabase.from('operational_costs').insert({ category: nf.category, description: nf.description, amount: Number(nf.amount) || 0, date: nf.date }); if (error) throw error; toast.success('Pengeluaran dicatat'); setShowAdd(false); setNf({ category:'', description:'', amount:0, date: format(new Date(), 'yyyy-MM-dd') }); run() } catch (err) { toast.error(err.message) } }
+  async function addOpex(e) { e.preventDefault(); if (!nf.category.trim()) return toast.error('Kategori wajib diisi'); if (!+nf.amount) return toast.error('Nominal harus > 0'); try { const { error } = await supabase.from('operational_costs').insert({ category: nf.category.trim(), description: nf.description, amount: Number(nf.amount) || 0, date: nf.date }); if (error) throw error; toast.success('Pengeluaran dicatat'); setShowAdd(false); setNf({ category:'', description:'', amount:0, date: format(new Date(), 'yyyy-MM-dd') }); run() } catch (err) { toast.error('Gagal simpan: ' + err.message) } }
   function delOpex(id) { ask('Hapus catatan pengeluaran ini?', async () => { const { error } = await supabase.from('operational_costs').delete().eq('id', id); if (error) toast.error(error.message); else toast.success('Pengeluaran dihapus'); run() }) }
   const Box = ({ icon: I, label, val, color }) => (<div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm"><div className={`p-2.5 rounded-lg w-fit mb-3 ${color.bg}`}><I className={`w-5 h-5 ${color.txt}`}/></div><p className="text-xs text-gray-500 uppercase font-medium mb-1">{label}</p><p className={`text-2xl font-bold ${color.val}`}>{val}</p></div>)
   if (load) return <div className="p-8 flex justify-center"><div className="w-8 h-8 border-4 border-[#0058A3] border-t-transparent rounded-full animate-spin"/></div>
@@ -54,7 +56,7 @@ export default function LabaRugi() {
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
           <div className="p-6 border-b flex justify-between items-center"><h3 className="text-lg font-bold">Biaya Operasional (periode ini)</h3><button onClick={() => setShowAdd(true)} className="flex items-center gap-1 px-3 py-1.5 bg-[#0058A3] text-white rounded-lg text-sm font-medium hover:bg-[#004080]"><Plus className="w-4 h-4"/>Catat</button></div>
           <div className="p-4 overflow-y-auto max-h-[420px] flex-1">
-            {!opexList.length ? <p className="text-center text-gray-400 text-sm py-10">Belum ada pengeluaran pada periode ini.</p> :
+            {!opexList.length ? <p className="text-center text-gray-400 text-sm py-10">Belum ada pengeluaran pada periode ini.<br/><span className="text-xs">Kalau kamu baru catat tapi tidak muncul, lihat toast merah di kanan-atas — sekarang error ditampilkan, tidak diam lagi.</span></p> :
             <div className="space-y-2">{opexList.map(c => (<div key={c.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
               <div className="min-w-0"><p className="text-sm font-medium text-gray-900 truncate">{c.category}</p><p className="text-xs text-gray-500 truncate">{c.description || '—'} · {new Date(c.date + 'T00:00:00').toLocaleDateString('id-ID')}</p></div>
               <div className="flex items-center gap-2 flex-shrink-0"><span className="text-sm font-bold text-red-600">-{rp(c.amount)}</span><button onClick={() => delOpex(c.id)} className="p-1.5 hover:bg-red-100 rounded text-red-600"><Trash2 className="w-4 h-4"/></button></div>
