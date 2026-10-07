@@ -20,10 +20,7 @@ export default function Sidebar({ currentPage, setCurrentPage }) {
   const fm = menu.filter(m => m.roles.includes(role))
   return (
     <aside className={`${collapsed ? 'w-20' : 'w-64'} bg-white border-r border-gray-200 h-screen sticky top-0 flex flex-col transition-all duration-300 shadow-sm flex-shrink-0`}>
-      <div className={`p-4 border-b border-gray-200 flex-shrink-0 ${collapsed ? 'flex flex-col items-center gap-3' : 'flex items-center gap-2.5'}`}>
-        <button onClick={() => setCollapsed(!collapsed)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-[#0058A3] transition-colors flex-shrink-0" title={collapsed ? 'Perluas menu' : 'Ciutkan menu'}>
-          <Menu className="w-5 h-5"/>
-        </button>
+      <div className={`p-4 border-b border-gray-200 flex-shrink-0 ${collapsed ? 'flex flex-col items-center gap-3' : 'flex items-center justify-between gap-2'}`}>
         {!collapsed ? (
           <div className="flex items-center gap-3 overflow-hidden">
             {ST.logo_sidebar_url ? <img src={ST.logo_sidebar_url} alt="logo" className="w-10 h-10 rounded-xl object-contain bg-white shadow-md flex-shrink-0"/> : <div className="w-10 h-10 bg-[#0058A3] rounded-xl flex items-center justify-center shadow-md flex-shrink-0"><Zap className="w-6 h-6 text-white"/></div>}
@@ -35,11 +32,14 @@ export default function Sidebar({ currentPage, setCurrentPage }) {
         ) : (
           ST.logo_sidebar_url ? <img src={ST.logo_sidebar_url} alt="logo" className="w-10 h-10 rounded-xl object-contain shadow-md"/> : <div className="w-10 h-10 bg-[#0058A3] rounded-xl flex items-center justify-center shadow-md"><Zap className="w-6 h-6 text-white"/></div>
         )}
+        <button onClick={() => setCollapsed(!collapsed)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-[#0058A3] transition-colors flex-shrink-0" title={collapsed ? 'Perluas menu' : 'Ciutkan menu'}>
+          <Menu className="w-5 h-5"/>
+        </button>
       </div>
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto scrollbar-thin">
         {fm.map(item => { const Icon = item.icon
           if (item.children) { const active = item.children.some(c => c.id === currentPage); return (<div key={item.id}>
-            <button onClick={() => collapsed ? setCurrentPage(item.children[0].id) : setKasirOpen(!kasirOpen)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group relative ${active ? 'bg-blue-50 text-[#0058A3]' : 'text-gray-600 hover:bg-gray-100 hover:text-[#0058A3]'}`} title={collapsed ? item.label : ''}><Icon className="w-5 h-5 flex-shrink-0"/>{!collapsed && <><span className="truncate flex-1 text-left">{item.label}</span><ChevronDown className={`w-4 h-4 transition-transform ${kasirOpen ? 'rotate-180' : ''}`}/></>}</button>
+            <button onClick={() => collapsed ? setCurrentPage(item.children[0].id) : setKasirOpen(!kasirOpen)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group relative ${active ? 'bg-blue-50 text-[#0058A3]' : 'text-gray-600 hover:bg-gray-100 hover:text-[#0058A3]'}`} title={collapsed ? item.label : ''}><Icon className="w-5 h-5 flex-shrink-0"/>{!collapsed && <><span className="truncate flex-1 text-left">{item.label}</span><ChevronDown className={`w-4 h-4 transition-transform ${kasirOpen ? 'rotate-180' : ''}/></>}</>}</button>
             {!collapsed && kasirOpen && <div className="ml-4 mt-1 space-y-1 border-l-2 border-gray-200 pl-3 animate-fade-in">{item.children.map(c => { const CI = c.icon; const a = currentPage === c.id; return (<button key={c.id} onClick={() => setCurrentPage(c.id)} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${a ? 'bg-[#0058A3] text-white font-medium shadow-sm' : 'text-gray-600 hover:bg-gray-100 hover:text-[#0058A3]'}`}><CI className="w-4 h-4 flex-shrink-0"/><span className="truncate">{c.label}</span></button>) })}</div>}
           </div>) }
           const a = currentPage === item.id; return (<button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group relative ${a ? 'bg-[#0058A3] text-white shadow-md' : 'text-gray-600 hover:bg-gray-100 hover:text-[#0058A3]'}`} title={collapsed ? item.label : ''}><Icon className="w-5 h-5 flex-shrink-0"/>{!collapsed && <span className="truncate">{item.label}</span>}</button>) })}
