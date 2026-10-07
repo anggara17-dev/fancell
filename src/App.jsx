@@ -8,6 +8,7 @@ import POSKasir from './pages/POSKasir'
 import MetodeBayar from './pages/MetodeBayar'
 import CetakPrinter from './pages/CetakPrinter'
 import MasterBarang from './pages/MasterBarang'
+import StokKartu from './pages/StokKartu'
 import RiwayatTransaksi from './pages/RiwayatTransaksi'
 import Konsinyasi from './pages/Konsinyasi'
 import Garansi from './pages/Garansi'
@@ -17,7 +18,6 @@ import Settings from './pages/Settings'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 
-// Favicon tab browser mengikuti logo toko dari Pengaturan
 function FaviconSync() {
   const ST = useStoreSettings()
   useEffect(() => {
@@ -25,7 +25,7 @@ function FaviconSync() {
     if (!url) return
     let link = document.querySelector("link[rel~='icon']")
     if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link) }
-    link.href = url + '?t=' + Date.now() // cache-buster biar ganti logo langsung terlihat
+    link.href = url + '?t=' + Date.now()
   }, [ST.logo_sidebar_url, ST.logo_struk_url])
   return null
 }
@@ -40,6 +40,7 @@ function MainApp() {
     'metode-bayar': 'Metode Pembayaran',
     cetak: 'Cetak / Printer',
     barang: 'Master Barang',
+    stok: 'Stok Masuk / Keluar',
     riwayat: 'Riwayat Transaksi',
     konsinyasi: 'Konsinyasi (Titip Jual)',
     garansi: 'Tracking Garansi',
@@ -54,6 +55,7 @@ function MainApp() {
       case 'metode-bayar': return <MetodeBayar />
       case 'cetak': return <CetakPrinter />
       case 'barang': return <MasterBarang />
+      case 'stok': return <StokKartu />
       case 'riwayat': return <RiwayatTransaksi />
       case 'konsinyasi': return <Konsinyasi />
       case 'garansi': return <Garansi />
