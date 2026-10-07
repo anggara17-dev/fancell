@@ -1,10 +1,19 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { invalidateSettings } from '../lib/useStoreSettings'
 import { Confirm, Modal, useToast } from '../components/ui'
 import { Plus, Edit2, Trash2, Check, Store, Users, Upload, ImageIcon, RotateCcw } from 'lucide-react'
 const emptyUser = { username:'', email:'', password:'', role:'kasir' }
+
+// FIX: dipindah ke luar komponen — kalau di dalam, input di-remount tiap ketikan & fokus hilang
+function Field({ label, children }) {
+  return <div><label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>{children}</div>
+}
+function LogoBox({ label, preview, onPick, onClear }) {
+  return (<div><label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label><div className="flex items-center gap-3"><div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50">{preview ? <img src={preview} alt="" className="w-full h-full object-contain"/> : <ImageIcon className="w-8 h-8 text-gray-300"/>}</div><div className="space-y-1"><label className="block cursor-pointer px-3 py-2 border rounded-lg text-sm hover:bg-gray-50 flex items-center gap-2"><Upload className="w-4 h-4"/>Pilih File<input type="file" accept="image/*" className="hidden" onChange={onPick}/></label>{preview && <button type="button" onClick={onClear} className="text-xs text-red-600 hover:underline">Hapus foto</button>}</div></div></div>)
+}
+
 export default function Settings() {
   const [tab, setTab] = useState('toko')
   return (
@@ -26,8 +35,20 @@ function TabToko() {
   const [loading, setLoading] = useState(true)
   const [logoSide, setLogoSide] = useState(null); const [logoStruk, setLogoStruk] = useState(null); const [saving, setSaving] = useState(false)
   const [prevSide, setPrevSide] = useState(null); const [prevStruk, setPrevStruk] = useState(null)
-  useEffect(() => { (async () => { const { data } = await supabase.from('settings').select('*').eq('id',1).maybeSingle(); if (data) setFd({ store_name:data.store_name||'', address:data.address||'', whatsapp:data.whatsapp||'', struk_footer:data.struk_footer||'', logo_sidebar_url:data.logo_sidebar_url||null, logo_struk_url:data.logo_struk_url||null }); setLoading(false) })() }, [])
-  const pickLogo = (setFile, setPrev) => e => { const f = e.target.files?.[0]; if (!f) return; if (f.size > 2 * 1024 * 1024) { toast.error('Ukuran gambar maksimal 2MB'); e.target.value = ''; return } setFile(f); setPrev(URL.createObjectURL(f)) }
+  // FIX: penanda "user sudah mulai mengetik" — respons fetch telat tidak boleh menimpa ketikan
+  const dirtyRef = useRef(false)
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      const { data } = await supabase.from('settings').select('*').eq('id', 1).maybeSingle()
+      if (!alive) return
+      if (data && !dirtyRef.current) setFd({ store_name:data.store_name||'', address:data.address||'', whatsapp:data.whatsapp||'', struk_footer:data.struk_footer||'', logo_sidebar_url:data.logo_sidebar_url||null, logo_struk_url:data.logo_struk_url||null })
+      setLoading(false)
+    })()
+    return () => { alive = false }
+  }, [])
+  const upd = (k, v) => { dirtyRef.current = true; setFd(f => ({ ...f, [k]: v })) }
+  const pickLogo = (setFile, setPrev) => e => { const f = e.target.files?.[0]; if (!f) return; if (f.size > 2 * 1024 * 1024) { toast.error('Ukuran gambar maksimal 2MB'); e.target.value = ''; return } dirtyRef.current = true; setFile(f); setPrev(URL.createObjectURL(f)) }
   async function upload(file, folder) { if (!file) return null; const ext = (file.name.split('.').pop() || 'png').toLowerCase(); const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`; const { error } = await supabase.storage.from('store-assets').upload(path, file, { contentType: file.type, upsert: true }); if (error) throw error; return supabase.storage.from('store-assets').getPublicUrl(path).data.publicUrl }
   async function save(e) {
     e.preventDefault(); setSaving(true)
@@ -43,18 +64,16 @@ function TabToko() {
       toast.success('Pengaturan toko disimpan')
     } catch (err) { toast.error('Gagal simpan: ' + err.message) } finally { setSaving(false) }
   }
-  const Field = ({ label, children }) => (<div><label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>{children}</div>)
-  const LogoBox = ({ label, preview, onPick, onClear }) => (<div><label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label><div className="flex items-center gap-3"><div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50">{preview ? <img src={preview} alt="" className="w-full h-full object-contain"/> : <ImageIcon className="w-8 h-8 text-gray-300"/>}</div><div className="space-y-1"><label className="block cursor-pointer px-3 py-2 border rounded-lg text-sm hover:bg-gray-50 flex items-center gap-2"><Upload className="w-4 h-4"/>Pilih File<input type="file" accept="image/*" className="hidden" onChange={onPick}/></label>{preview && <button type="button" onClick={onClear} className="text-xs text-red-600 hover:underline">Hapus foto</button>}</div></div></div>)
   if (loading) return <div className="p-8 flex justify-center"><div className="w-8 h-8 border-4 border-[#0058A3] border-t-transparent rounded-full animate-spin"/></div>
   return (
     <form onSubmit={save} className="bg-white rounded-xl border shadow-sm p-6 max-w-2xl space-y-4">
       <h3 className="text-lg font-bold">Pengaturan Toko</h3>
-      <Field label="Nama Toko"><input value={fd.store_name} onChange={e => setFd({ ...fd, store_name: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-[#0058A3]"/></Field>
-      <Field label="Alamat"><input value={fd.address} onChange={e => setFd({ ...fd, address: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-[#0058A3]"/></Field>
-      <Field label="Nomor WhatsApp / Telp"><input value={fd.whatsapp} onChange={e => setFd({ ...fd, whatsapp: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-[#0058A3]"/></Field>
-      <Field label="Footer Struk"><input value={fd.struk_footer} onChange={e => setFd({ ...fd, struk_footer: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-[#0058A3]"/></Field>
-      <LogoBox label="Logo Toko (Tampil di Sidebar)" preview={prevSide || fd.logo_sidebar_url} onPick={pickLogo(setLogoSide, setPrevSide)} onClear={() => { setLogoSide(null); setPrevSide(null); setFd({ ...fd, logo_sidebar_url: null }) }}/>
-      <LogoBox label="Logo Struk (Tampil di print struk)" preview={prevStruk || fd.logo_struk_url} onPick={pickLogo(setLogoStruk, setPrevStruk)} onClear={() => { setLogoStruk(null); setPrevStruk(null); setFd({ ...fd, logo_struk_url: null }) }}/>
+      <Field label="Nama Toko"><input value={fd.store_name} onChange={e => upd('store_name', e.target.value)} className="w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-[#0058A3]"/></Field>
+      <Field label="Alamat"><input value={fd.address} onChange={e => upd('address', e.target.value)} className="w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-[#0058A3]"/></Field>
+      <Field label="Nomor WhatsApp / Telp"><input value={fd.whatsapp} onChange={e => upd('whatsapp', e.target.value)} className="w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-[#0058A3]"/></Field>
+      <Field label="Footer Struk"><input value={fd.struk_footer} onChange={e => upd('struk_footer', e.target.value)} className="w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-[#0058A3]"/></Field>
+      <LogoBox label="Logo Toko (Tampil di Sidebar)" preview={prevSide || fd.logo_sidebar_url} onPick={pickLogo(setLogoSide, setPrevSide)} onClear={() => { upd('logo_sidebar_url', null); setLogoSide(null); setPrevSide(null) }}/>
+      <LogoBox label="Logo Struk (Tampil di print struk)" preview={prevStruk || fd.logo_struk_url} onPick={pickLogo(setLogoStruk, setPrevStruk)} onClear={() => { upd('logo_struk_url', null); setLogoStruk(null); setPrevStruk(null) }}/>
       <button type="submit" disabled={saving} className="px-6 py-2.5 bg-[#0058A3] text-white rounded-lg font-medium flex items-center gap-2 hover:bg-[#004080] disabled:opacity-50">{saving ? 'Menyimpan...' : <><Check className="w-4 h-4"/>Simpan Pengaturan</>}</button>
       <p className="text-[11px] text-gray-400">Setelah simpan, sidebar & struk langsung ikut berubah tanpa refresh (data tersimpan permanen di database).</p>
     </form>
