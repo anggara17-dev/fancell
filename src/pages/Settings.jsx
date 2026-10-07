@@ -9,8 +9,7 @@ export default function Settings() {
   const [tab, setTab] = useState('toko')
   return (
     <div className="p-6 lg:p-8">
-      <div className="mb-6"><h2 className="text-2xl font-bold text-gray-900">Pengaturan</h2><p className="text-sm text-gray-500 mt-0.5">Profil toko & manajemen user</p></div>
-      <div className="flex gap-2 mb-6 border-b">
+      <div className="sticky top-0 z-20 -mx-6 lg:-mx-8 px-6 lg:px-8 py-3 mb-4 bg-[rgba(248,250,252,0.95)] backdrop-blur-[6px] border-b border-gray-200"><p className="text-sm text-gray-500 mb-3">Profil toko & manajemen user</p><div className="flex gap-2">
         <button onClick={() => setTab('toko')} className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px flex items-center gap-2 ${tab === 'toko' ? 'border-[#0058A3] text-[#0058A3]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Store className="w-4 h-4"/>Toko</button>
         <button onClick={() => setTab('user')} className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px flex items-center gap-2 ${tab === 'user' ? 'border-[#0058A3] text-[#0058A3]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Users className="w-4 h-4"/>User & Hak Akses</button>
       </div>
