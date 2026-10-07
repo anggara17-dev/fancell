@@ -38,8 +38,8 @@ export default function LabaRugi() {
   if (load) return <div className="p-8 flex justify-center"><div className="w-8 h-8 border-4 border-[#0058A3] border-t-transparent rounded-full animate-spin"/></div>
   return (
     <div className="p-6 lg:p-8">
-      <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
-        <div><h2 className="text-2xl font-bold">Laba Rugi</h2><p className="text-sm text-gray-500 mt-0.5">{format(new Date(from + 'T00:00:00'), 'dd MMM yyyy', { locale: id })} — {format(new Date(to + 'T00:00:00'), 'dd MMM yyyy', { locale: id })}</p></div>
+      <div className="sticky top-0 z-20 -mx-6 lg:-mx-8 px-6 lg:px-8 py-3 mb-4 flex justify-between items-center flex-wrap gap-3 bg-[rgba(248,250,252,0.95)] backdrop-blur-[6px] border-b border-gray-200">
+        <div><p className="text-sm text-gray-500">{format(new Date(from + 'T00:00:00'), 'dd MMM yyyy', { locale: id })} — {format(new Date(to + 'T00:00:00'), 'dd MMM yyyy', { locale: id })}</p></div>
         <div className="flex items-center gap-2 bg-gray-50 border rounded-lg p-1"><input type="date" value={from} onChange={e => setFrom(e.target.value)} className="text-sm bg-transparent px-2 outline-none"/><span className="text-gray-400">-</span><input type="date" value={to} onChange={e => setTo(e.target.value)} className="text-sm bg-transparent px-2 outline-none"/></div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
