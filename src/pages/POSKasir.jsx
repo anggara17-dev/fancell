@@ -62,6 +62,8 @@ export default function POSKasir() {
       if (useTT && tt.name) await supabase.from('trade_ins').insert({ transaction_id: tx.id, device_name: tt.name, device_imei: tt.imei, device_condition: tt.cond, trade_in_value: ttVal })
       const cons = (insItems || []).filter(r => r.is_consignment && r.owner_id && r.split_percent != null)
       if (cons.length) await supabase.from('consignment_settlements').insert(cons.map(r => ({ owner_id: r.owner_id, variant_id: r.product_id, transaction_id: tx.id, item_id: r.id, product_name: r.product_name, imei: r.imei, sale_price: r.line_total, split_percent: r.split_percent, owner_share: Math.round(r.line_total * r.split_percent / 100), store_share: r.line_total - Math.round(r.line_total * r.split_percent / 100) })))
+            const moveRows = cart.map(i => ({ variant_id: i.variantId, product_name: i.productName, variant_label: i.variantLabel, direction: 'out', reason: 'penjualan', qty: i.qty, imei: i.imei || null, note: 'Penjualan POS ' + inv, transaction_id: tx.id, created_by: user?.username || 'Kasir' }))
+      if (moveRows.length) await supabase.from('stock_movements').insert(moveRows)
       for (const i of cart) { if (i.isImei) await supabase.from('product_imeis').update({ status: 'sold' }).eq('imei', i.imei); else await supabase.from('product_variants').update({ stock_qty: Math.max(0, i.baseStock - i.qty) }).eq('id', i.variantId) }
       setDone({ ...tx, items, payments: payRows, cashier: user?.username || 'Kasir' }); setShowPay(false); clearAll(); boot(); toast.success('Transaksi berhasil & stok terupdate')
     } catch (err) { toast.error('Gagal: ' + err.message) } finally { setProcessing(false) }
