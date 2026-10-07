@@ -127,7 +127,10 @@ export default function MasterBarang() {
             const toDel = existing.filter(e => e.status === 'available' && !desired.includes(e.imei)).map(e => e.id)
             if (toDel.length) await supabase.from('product_imeis').delete().in('id', toDel)
             const toAdd = desired.filter(d => !existingSet.has(d))
-            if (toAdd.length) await supabase.from('product_imeis').insert(toAdd.map(im => ({ variant_id: v.id, imei: im, status: 'available' })))
+            if (toAdd.length) {
+              await supabase.from('product_imeis').insert(toAdd.map(im => ({ variant_id: v.id, imei: im, status: 'available' })))
+              await supabase.from('stock_movements').insert(toAdd.map(im => ({ variant_id: v.id, product_name: fd.name.trim(), variant_label: [v.color, v.storage].filter(x => x && x !== '-').join(' - ') || 'Standar', direction: 'in', reason: 'pembelian', qty: 1, imei: im, note: 'Ditambahkan via Master Barang' })))
+            }
           } else {
             const { data: vr, error: e2 } = await supabase.from('product_variants').insert({ product_id: pid, ...fields }).select().single()
             if (e2) throw e2
@@ -142,7 +145,12 @@ export default function MasterBarang() {
           if (e2) throw e2
           if (isImei && v.imeis) {
             const arr = v.imeis.split('\n').map(s => s.trim()).filter(Boolean)
-            if (arr.length) await supabase.from('product_imeis').insert(arr.map(im => ({ variant_id: vr.id, imei: im, status: 'available' })))
+            if (arr.length) {
+              await supabase.from('product_imeis').insert(arr.map(im => ({ variant_id: vr.id, imei: im, status: 'available' })))
+              await supabase.from('stock_movements').insert(arr.map(im => ({ variant_id: vr.id, product_name: fd.name.trim(), variant_label: [v.color, v.storage].filter(x => x && x !== '-').join(' - ') || 'Standar', direction: 'in', reason: 'stok_awal', qty: 1, imei: im, note: 'Stok awal saat tambah produk' })))
+            }
+          } else if (!isImei && (+v.stock_qty || 0) > 0) {
+            await supabase.from('stock_movements').insert({ variant_id: vr.id, product_name: fd.name.trim(), variant_label: [v.color, v.storage].filter(x => x && x !== '-').join(' - ') || 'Standar', direction: 'in', reason: 'stok_awal', qty: +v.stock_qty || 0, note: 'Stok awal saat tambah produk' })
           }
         }
       }
@@ -325,10 +333,10 @@ export default function MasterBarang() {
                       <RupiahInput value={v.hpp} onChange={x => setVariant(idx, 'hpp', x)} className="w-full px-3 py-2 border rounded-lg text-sm text-right outline-none focus:ring-2 focus:ring-[#0058A3]" placeholder="HPP" />
                       <span className="text-[10px] text-gray-400">HPP / Modal</span>
                     </div>
-                    {fd.stock_type === 'qty' && (
+                                        {fd.stock_type === 'qty' && !editing && (
                       <div className="col-span-2 md:col-span-1">
-                        <input type="number" value={v.stock_qty} onChange={e => setVariant(idx, 'stock_qty', e.target.value)} placeholder="Stok" className="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#0058A3]" />
-                        <span className="text-[10px] text-gray-400">Jumlah Stok</span>
+                        <input type="number" value={v.stock_qty} onChange={e => setVariant(idx, 'stock_qty', e.target.value)} placeholder="0" className="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#0058A3]" />
+                        <span className="text-[10px] text-gray-400">Stok Awal (tercatat sbg mutasi)</span>
                       </div>
                     )}
                   </div>
