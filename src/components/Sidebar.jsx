@@ -1,12 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useStoreSettings } from '../lib/useStoreSettings'
-import { LayoutDashboard, ShoppingCart, Package, History, FileText, Wallet, Settings, ShieldCheck, Repeat, ChevronLeft, ChevronRight, ChevronDown, LogOut, Zap, CreditCard, Printer } from 'lucide-react'
+import { LayoutDashboard, ShoppingCart, Package, History, FileText, Wallet, Settings, ShieldCheck, Repeat, ChevronDown, LogOut, Zap, CreditCard, Printer, Menu } from 'lucide-react'
 export default function Sidebar({ currentPage, setCurrentPage }) {
   const { user, role, logout } = useAuth(); const ST = useStoreSettings()
   const [collapsed, setCollapsed] = useState(false); const [userMenuOpen, setUserMenuOpen] = useState(false); const [kasirOpen, setKasirOpen] = useState(true); const ref = useRef(null)
   useEffect(() => { const h = e => { if (ref.current && !ref.current.contains(e.target)) setUserMenuOpen(false) }; document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h) }, [])
-  // FIX: dropdown Kasir/POS otomatis tertutup saat tidak berada di halaman kasir
   useEffect(() => { if (!['kasir','metode-bayar','cetak'].includes(currentPage)) setKasirOpen(false) }, [currentPage])
   const menu = [
     { id:'dashboard', label:'Dashboard', icon:LayoutDashboard, roles:['owner','kasir'] },
@@ -20,11 +19,23 @@ export default function Sidebar({ currentPage, setCurrentPage }) {
     { id:'pengaturan', label:'Pengaturan', icon:Settings, roles:['owner'] } ]
   const fm = menu.filter(m => m.roles.includes(role))
   return (
-    <aside className={`${collapsed ? 'w-20' : 'w-64'} bg-white border-r border-gray-200 h-screen sticky top-0 flex flex-col transition-all duration-300 relative shadow-sm flex-shrink-0`}>
-      <div className="p-5 flex items-center border-b border-gray-200 flex-shrink-0">
-        {!collapsed ? (<div className="flex items-center gap-3 overflow-hidden">{ST.logo_sidebar_url ? <img src={ST.logo_sidebar_url} alt="logo" className="w-10 h-10 rounded-xl object-contain bg-white shadow-md flex-shrink-0"/> : <div className="w-10 h-10 bg-[#0058A3] rounded-xl flex items-center justify-center shadow-md flex-shrink-0"><Zap className="w-6 h-6 text-white"/></div>}<div className="min-w-0"><h1 className="text-lg font-bold tracking-wider text-gray-900">{(ST.store_name || 'FANCELL').toUpperCase()}</h1><p className="text-[10px] text-gray-500 -mt-0.5">POS & Bookkeeping</p></div></div>) : (ST.logo_sidebar_url ? <img src={ST.logo_sidebar_url} alt="logo" className="w-10 h-10 rounded-xl object-contain mx-auto shadow-md"/> : <div className="w-10 h-10 bg-[#0058A3] rounded-xl flex items-center justify-center mx-auto shadow-md"><Zap className="w-6 h-6 text-white"/></div>)}
+    <aside className={`${collapsed ? 'w-20' : 'w-64'} bg-white border-r border-gray-200 h-screen sticky top-0 flex flex-col transition-all duration-300 shadow-sm flex-shrink-0`}>
+      <div className={`p-4 border-b border-gray-200 flex-shrink-0 ${collapsed ? 'flex flex-col items-center gap-3' : 'flex items-center gap-2.5'}`}>
+        <button onClick={() => setCollapsed(!collapsed)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-[#0058A3] transition-colors flex-shrink-0" title={collapsed ? 'Perluas menu' : 'Ciutkan menu'}>
+          <Menu className="w-5 h-5"/>
+        </button>
+        {!collapsed ? (
+          <div className="flex items-center gap-3 overflow-hidden">
+            {ST.logo_sidebar_url ? <img src={ST.logo_sidebar_url} alt="logo" className="w-10 h-10 rounded-xl object-contain bg-white shadow-md flex-shrink-0"/> : <div className="w-10 h-10 bg-[#0058A3] rounded-xl flex items-center justify-center shadow-md flex-shrink-0"><Zap className="w-6 h-6 text-white"/></div>}
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold tracking-wider text-gray-900 truncate">{(ST.store_name || 'FANCELL').toUpperCase()}</h1>
+              <p className="text-[10px] text-gray-500 -mt-0.5">POS & Bookkeeping</p>
+            </div>
+          </div>
+        ) : (
+          ST.logo_sidebar_url ? <img src={ST.logo_sidebar_url} alt="logo" className="w-10 h-10 rounded-xl object-contain shadow-md"/> : <div className="w-10 h-10 bg-[#0058A3] rounded-xl flex items-center justify-center shadow-md"><Zap className="w-6 h-6 text-white"/></div>
+        )}
       </div>
-      <button onClick={() => setCollapsed(!collapsed)} className="absolute -right-3 top-20 w-6 h-6 bg-[#0058A3] hover:bg-[#004080] text-white rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 shadow-lg z-20">{collapsed ? <ChevronRight className="w-3.5 h-3.5"/> : <ChevronLeft className="w-3.5 h-3.5"/>}</button>
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto scrollbar-thin">
         {fm.map(item => { const Icon = item.icon
           if (item.children) { const active = item.children.some(c => c.id === currentPage); return (<div key={item.id}>
