@@ -39,7 +39,13 @@ export default function Sidebar({ currentPage, setCurrentPage }) {
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto scrollbar-thin">
         {fm.map(item => { const Icon = item.icon
           if (item.children) { const active = item.children.some(c => c.id === currentPage); return (<div key={item.id}>
-            <button onClick={() => collapsed ? setCurrentPage(item.children[0].id) : setKasirOpen(!kasirOpen)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group relative ${active ? 'bg-blue-50 text-[#0058A3]' : 'text-gray-600 hover:bg-gray-100 hover:text-[#0058A3]'}`} title={collapsed ? item.label : ''}><Icon className="w-5 h-5 flex-shrink-0"/>{!collapsed && <><span className="truncate flex-1 text-left">{item.label}</span><ChevronDown className={`w-4 h-4 transition-transform ${kasirOpen ? 'rotate-180' : ''}/></>}</>}</button>
+            <button onClick={() => collapsed ? setCurrentPage(item.children[0].id) : setKasirOpen(!kasirOpen)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group relative ${active ? 'bg-blue-50 text-[#0058A3]' : 'text-gray-600 hover:bg-gray-100 hover:text-[#0058A3]'}`} title={collapsed ? item.label : ''}>
+              <Icon className="w-5 h-5 flex-shrink-0"/>
+              {!collapsed && <>
+                <span className="truncate flex-1 text-left">{item.label}</span>
+                <ChevronDown className={`w-4 h-4 transition-transform ${kasirOpen ? 'rotate-180' : ''}`}/>
+              </>}
+            </button>
             {!collapsed && kasirOpen && <div className="ml-4 mt-1 space-y-1 border-l-2 border-gray-200 pl-3 animate-fade-in">{item.children.map(c => { const CI = c.icon; const a = currentPage === c.id; return (<button key={c.id} onClick={() => setCurrentPage(c.id)} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${a ? 'bg-[#0058A3] text-white font-medium shadow-sm' : 'text-gray-600 hover:bg-gray-100 hover:text-[#0058A3]'}`}><CI className="w-4 h-4 flex-shrink-0"/><span className="truncate">{c.label}</span></button>) })}</div>}
           </div>) }
           const a = currentPage === item.id; return (<button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group relative ${a ? 'bg-[#0058A3] text-white shadow-md' : 'text-gray-600 hover:bg-gray-100 hover:text-[#0058A3]'}`} title={collapsed ? item.label : ''}><Icon className="w-5 h-5 flex-shrink-0"/>{!collapsed && <span className="truncate">{item.label}</span>}</button>) })}
