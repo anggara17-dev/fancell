@@ -135,7 +135,10 @@ export default function MasterBarang() {
             const { data: vr, error: e2 } = await supabase.from('product_variants').insert({ product_id: pid, ...fields }).select().single()
             if (e2) throw e2
             const desired = (v.imeis || '').split('\n').map(s => s.trim()).filter(Boolean)
-            if (isImei && desired.length) await supabase.from('product_imeis').insert(desired.map(im => ({ variant_id: vr.id, imei: im, status: 'available' })))
+            if (isImei && desired.length) {
+              await supabase.from('product_imeis').insert(desired.map(im => ({ variant_id: vr.id, imei: im, status: 'available' })))
+              await supabase.from('stock_movements').insert(desired.map(im => ({ variant_id: vr.id, product_name: fd.name.trim(), variant_label: [v.color, v.storage].filter(x => x && x !== '-').join(' - ') || 'Standar', direction: 'in', reason: 'pembelian', qty: 1, imei: im, note: 'Varian baru via Master Barang' })))
+            }
           }
         }
       } else {
@@ -333,7 +336,7 @@ export default function MasterBarang() {
                       <RupiahInput value={v.hpp} onChange={x => setVariant(idx, 'hpp', x)} className="w-full px-3 py-2 border rounded-lg text-sm text-right outline-none focus:ring-2 focus:ring-[#0058A3]" placeholder="HPP" />
                       <span className="text-[10px] text-gray-400">HPP / Modal</span>
                     </div>
-                                        {fd.stock_type === 'qty' && !editing && (
+                    {fd.stock_type === 'qty' && !editing && (
                       <div className="col-span-2 md:col-span-1">
                         <input type="number" value={v.stock_qty} onChange={e => setVariant(idx, 'stock_qty', e.target.value)} placeholder="0" className="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#0058A3]" />
                         <span className="text-[10px] text-gray-400">Stok Awal (tercatat sbg mutasi)</span>
