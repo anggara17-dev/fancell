@@ -9,9 +9,12 @@ export default function Settings() {
   const [tab, setTab] = useState('toko')
   return (
     <div className="p-6 lg:p-8">
-      <div className="sticky top-0 z-20 -mx-6 lg:-mx-8 px-6 lg:px-8 py-3 mb-4 bg-[rgba(248,250,252,0.95)] backdrop-blur-[6px] border-b border-gray-200"><p className="text-sm text-gray-500 mb-3">Profil toko & manajemen user</p><div className="flex gap-2">
-        <button onClick={() => setTab('toko')} className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px flex items-center gap-2 ${tab === 'toko' ? 'border-[#0058A3] text-[#0058A3]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Store className="w-4 h-4"/>Toko</button>
-        <button onClick={() => setTab('user')} className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px flex items-center gap-2 ${tab === 'user' ? 'border-[#0058A3] text-[#0058A3]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Users className="w-4 h-4"/>User & Hak Akses</button>
+      <div className="sticky top-0 z-20 -mx-6 lg:-mx-8 px-6 lg:px-8 py-3 mb-4 bg-[rgba(248,250,252,0.95)] backdrop-blur-[6px] border-b border-gray-200">
+        <p className="text-sm text-gray-500 mb-3">Profil toko & manajemen user</p>
+        <div className="flex gap-2">
+          <button onClick={() => setTab('toko')} className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px flex items-center gap-2 ${tab === 'toko' ? 'border-[#0058A3] text-[#0058A3]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Store className="w-4 h-4"/>Toko</button>
+          <button onClick={() => setTab('user')} className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px flex items-center gap-2 ${tab === 'user' ? 'border-[#0058A3] text-[#0058A3]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><Users className="w-4 h-4"/>User & Hak Akses</button>
+        </div>
       </div>
       {tab === 'toko' ? <TabToko/> : <TabUser/>}
     </div>
@@ -24,7 +27,6 @@ function TabToko() {
   const [logoSide, setLogoSide] = useState(null); const [logoStruk, setLogoStruk] = useState(null); const [saving, setSaving] = useState(false)
   const [prevSide, setPrevSide] = useState(null); const [prevStruk, setPrevStruk] = useState(null)
   useEffect(() => { (async () => { const { data } = await supabase.from('settings').select('*').eq('id',1).maybeSingle(); if (data) setFd({ store_name:data.store_name||'', address:data.address||'', whatsapp:data.whatsapp||'', struk_footer:data.struk_footer||'', logo_sidebar_url:data.logo_sidebar_url||null, logo_struk_url:data.logo_struk_url||null }); setLoading(false) })() }, [])
-  // FIX: validasi ukuran + simpan preview di state (tidak bikin blob URL baru tiap render)
   const pickLogo = (setFile, setPrev) => e => { const f = e.target.files?.[0]; if (!f) return; if (f.size > 2 * 1024 * 1024) { toast.error('Ukuran gambar maksimal 2MB'); e.target.value = ''; return } setFile(f); setPrev(URL.createObjectURL(f)) }
   async function upload(file, folder) { if (!file) return null; const ext = (file.name.split('.').pop() || 'png').toLowerCase(); const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`; const { error } = await supabase.storage.from('store-assets').upload(path, file, { contentType: file.type, upsert: true }); if (error) throw error; return supabase.storage.from('store-assets').getPublicUrl(path).data.publicUrl }
   async function save(e) {
@@ -65,7 +67,6 @@ function TabUser() {
   useEffect(() => { run() }, [])
   async function run() { const { data, error } = await supabase.from('users').select('id, username, email, role, is_active').order('username'); if (error) toast.error(error.message); setUsers(data || []); setLoad(false) }
   async function submit(e) { e.preventDefault(); try { if (editing) { const upd = { username: fd.username, email: fd.email || null, role: fd.role }; if (fd.password) upd.password = fd.password; const { error } = await supabase.from('users').update(upd).eq('id', editing.id); if (error) throw error; toast.success('User diupdate') } else { if (!fd.password) return toast.error('Password wajib diisi'); const { error } = await supabase.from('users').insert({ username: fd.username, email: fd.email || null, password: fd.password, role: fd.role, is_active: true }); if (error) throw error; toast.success('User ditambahkan') } setShowForm(false); setEditing(null); setFd(emptyUser); run() } catch (err) { toast.error(err.message) } }
-  // FIX: soft-delete — nonaktifkan/aktifkan, jangan hard delete (merusak FK transaksi & bisa lockout)
   function toggleUser(u) {
     if (u.id === me?.id) return toast.error('Tidak bisa menonaktifkan akun sendiri')
     if (u.is_active === false) {
