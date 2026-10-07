@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { useAuth } from '../context/AuthContext'
 import { invalidateSettings } from '../lib/useStoreSettings'
 import { Confirm, Modal, useToast } from '../components/ui'
-import { Plus, Edit2, Trash2, Check, Store, Users, Upload, ImageIcon } from 'lucide-react'
+import { Plus, Edit2, Trash2, Check, Store, Users, Upload, ImageIcon, RotateCcw } from 'lucide-react'
 const emptyUser = { username:'', email:'', password:'', role:'kasir' }
 export default function Settings() {
   const [tab, setTab] = useState('toko')
@@ -22,7 +23,10 @@ function TabToko() {
   const [fd, setFd] = useState({ store_name:'', address:'', whatsapp:'', struk_footer:'', logo_sidebar_url:null, logo_struk_url:null })
   const [loading, setLoading] = useState(true)
   const [logoSide, setLogoSide] = useState(null); const [logoStruk, setLogoStruk] = useState(null); const [saving, setSaving] = useState(false)
+  const [prevSide, setPrevSide] = useState(null); const [prevStruk, setPrevStruk] = useState(null)
   useEffect(() => { (async () => { const { data } = await supabase.from('settings').select('*').eq('id',1).maybeSingle(); if (data) setFd({ store_name:data.store_name||'', address:data.address||'', whatsapp:data.whatsapp||'', struk_footer:data.struk_footer||'', logo_sidebar_url:data.logo_sidebar_url||null, logo_struk_url:data.logo_struk_url||null }); setLoading(false) })() }, [])
+  // FIX: validasi ukuran + simpan preview di state (tidak bikin blob URL baru tiap render)
+  const pickLogo = (setFile, setPrev) => e => { const f = e.target.files?.[0]; if (!f) return; if (f.size > 2 * 1024 * 1024) { toast.error('Ukuran gambar maksimal 2MB'); e.target.value = ''; return } setFile(f); setPrev(URL.createObjectURL(f)) }
   async function upload(file, folder) { if (!file) return null; const ext = (file.name.split('.').pop() || 'png').toLowerCase(); const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`; const { error } = await supabase.storage.from('store-assets').upload(path, file, { contentType: file.type, upsert: true }); if (error) throw error; return supabase.storage.from('store-assets').getPublicUrl(path).data.publicUrl }
   async function save(e) {
     e.preventDefault(); setSaving(true)
@@ -33,13 +37,13 @@ function TabToko() {
       const { error } = await supabase.from('settings').upsert(row)
       if (error) throw error
       setFd({ ...fd, logo_sidebar_url: urlSide || null, logo_struk_url: urlStruk || null })
-      setLogoSide(null); setLogoStruk(null)
+      setLogoSide(null); setLogoStruk(null); setPrevSide(null); setPrevStruk(null)
       invalidateSettings()
       toast.success('Pengaturan toko disimpan')
     } catch (err) { toast.error('Gagal simpan: ' + err.message) } finally { setSaving(false) }
   }
   const Field = ({ label, children }) => (<div><label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>{children}</div>)
-  const LogoBox = ({ label, preview, file, setFile, onClear }) => (<div><label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label><div className="flex items-center gap-3"><div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50">{preview ? <img src={preview} alt="" className="w-full h-full object-contain"/> : <ImageIcon className="w-8 h-8 text-gray-300"/>}</div><div className="space-y-1"><label className="block cursor-pointer px-3 py-2 border rounded-lg text-sm hover:bg-gray-50 flex items-center gap-2"><Upload className="w-4 h-4"/>Pilih File<input type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) setFile(f) }}/></label>{(preview || file) && <button type="button" onClick={onClear} className="text-xs text-red-600 hover:underline">Hapus foto</button>}</div></div></div>)
+  const LogoBox = ({ label, preview, onPick, onClear }) => (<div><label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label><div className="flex items-center gap-3"><div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50">{preview ? <img src={preview} alt="" className="w-full h-full object-contain"/> : <ImageIcon className="w-8 h-8 text-gray-300"/>}</div><div className="space-y-1"><label className="block cursor-pointer px-3 py-2 border rounded-lg text-sm hover:bg-gray-50 flex items-center gap-2"><Upload className="w-4 h-4"/>Pilih File<input type="file" accept="image/*" className="hidden" onChange={onPick}/></label>{preview && <button type="button" onClick={onClear} className="text-xs text-red-600 hover:underline">Hapus foto</button>}</div></div></div>)
   if (loading) return <div className="p-8 flex justify-center"><div className="w-8 h-8 border-4 border-[#0058A3] border-t-transparent rounded-full animate-spin"/></div>
   return (
     <form onSubmit={save} className="bg-white rounded-xl border shadow-sm p-6 max-w-2xl space-y-4">
@@ -48,21 +52,29 @@ function TabToko() {
       <Field label="Alamat"><input value={fd.address} onChange={e => setFd({ ...fd, address: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-[#0058A3]"/></Field>
       <Field label="Nomor WhatsApp / Telp"><input value={fd.whatsapp} onChange={e => setFd({ ...fd, whatsapp: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-[#0058A3]"/></Field>
       <Field label="Footer Struk"><input value={fd.struk_footer} onChange={e => setFd({ ...fd, struk_footer: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-[#0058A3]"/></Field>
-      <LogoBox label="Logo Toko (Tampil di Sidebar)" preview={logoSide ? URL.createObjectURL(logoSide) : fd.logo_sidebar_url} file={logoSide} setFile={setLogoSide} onClear={() => { setLogoSide(null); setFd({ ...fd, logo_sidebar_url: null }) }}/>
-      <LogoBox label="Logo Struk (Tampil di print struk)" preview={logoStruk ? URL.createObjectURL(logoStruk) : fd.logo_struk_url} file={logoStruk} setFile={setLogoStruk} onClear={() => { setLogoStruk(null); setFd({ ...fd, logo_struk_url: null }) }}/>
+      <LogoBox label="Logo Toko (Tampil di Sidebar)" preview={prevSide || fd.logo_sidebar_url} onPick={pickLogo(setLogoSide, setPrevSide)} onClear={() => { setLogoSide(null); setPrevSide(null); setFd({ ...fd, logo_sidebar_url: null }) }}/>
+      <LogoBox label="Logo Struk (Tampil di print struk)" preview={prevStruk || fd.logo_struk_url} onPick={pickLogo(setLogoStruk, setPrevStruk)} onClear={() => { setLogoStruk(null); setPrevStruk(null); setFd({ ...fd, logo_struk_url: null }) }}/>
       <button type="submit" disabled={saving} className="px-6 py-2.5 bg-[#0058A3] text-white rounded-lg font-medium flex items-center gap-2 hover:bg-[#004080] disabled:opacity-50">{saving ? 'Menyimpan...' : <><Check className="w-4 h-4"/>Simpan Pengaturan</>}</button>
       <p className="text-[11px] text-gray-400">Setelah simpan, sidebar & struk langsung ikut berubah tanpa refresh (data tersimpan permanen di database).</p>
     </form>
   )
 }
 function TabUser() {
-  const toast = useToast()
+  const toast = useToast(); const { user: me } = useAuth()
   const [users, setUsers] = useState([]); const [load, setLoad] = useState(true); const [showForm, setShowForm] = useState(false); const [editing, setEditing] = useState(null); const [fd, setFd] = useState(emptyUser)
-  const [cf, setCf] = useState(null); const ask = (message, action) => setCf({ message, action })
+  const [cf, setCf] = useState(null); const ask = (message, action, confirmText) => setCf({ message, action, confirmText })
   useEffect(() => { run() }, [])
   async function run() { const { data, error } = await supabase.from('users').select('id, username, email, role, is_active').order('username'); if (error) toast.error(error.message); setUsers(data || []); setLoad(false) }
-  async function submit(e) { e.preventDefault(); try { if (editing) { const upd = { username: fd.username, email: fd.email, role: fd.role }; if (fd.password) upd.password = fd.password; const { error } = await supabase.from('users').update(upd).eq('id', editing.id); if (error) throw error; toast.success('User diupdate') } else { if (!fd.password) return toast.error('Password wajib diisi'); const { error } = await supabase.from('users').insert({ username: fd.username, email: fd.email, password: fd.password, role: fd.role, is_active: true }); if (error) throw error; toast.success('User ditambahkan') } setShowForm(false); setEditing(null); setFd(emptyUser); run() } catch (err) { toast.error(err.message) } }
-  function del(id) { ask('Hapus user ini?', async () => { const { error } = await supabase.from('users').delete().eq('id', id); if (error) toast.error(error.message); else toast.success('User dihapus'); run() }) }
+  async function submit(e) { e.preventDefault(); try { if (editing) { const upd = { username: fd.username, email: fd.email || null, role: fd.role }; if (fd.password) upd.password = fd.password; const { error } = await supabase.from('users').update(upd).eq('id', editing.id); if (error) throw error; toast.success('User diupdate') } else { if (!fd.password) return toast.error('Password wajib diisi'); const { error } = await supabase.from('users').insert({ username: fd.username, email: fd.email || null, password: fd.password, role: fd.role, is_active: true }); if (error) throw error; toast.success('User ditambahkan') } setShowForm(false); setEditing(null); setFd(emptyUser); run() } catch (err) { toast.error(err.message) } }
+  // FIX: soft-delete — nonaktifkan/aktifkan, jangan hard delete (merusak FK transaksi & bisa lockout)
+  function toggleUser(u) {
+    if (u.id === me?.id) return toast.error('Tidak bisa menonaktifkan akun sendiri')
+    if (u.is_active === false) {
+      ask(`Aktifkan kembali user "${u.username}"?`, async () => { const { error } = await supabase.from('users').update({ is_active: true }).eq('id', u.id); if (error) toast.error(error.message); else toast.success('User diaktifkan kembali'); run() }, 'Ya, Aktifkan')
+    } else {
+      ask(`Nonaktifkan user "${u.username}"? User tidak akan bisa login lagi.`, async () => { const { error } = await supabase.from('users').update({ is_active: false }).eq('id', u.id); if (error) toast.error(error.message); else toast.success('User dinonaktifkan'); run() }, 'Ya, Nonaktifkan')
+    }
+  }
   function edit(u) { setEditing(u); setFd({ username: u.username, email: u.email || '', password: '', role: u.role }); setShowForm(true) }
   function add() { setEditing(null); setFd(emptyUser); setShowForm(true) }
   const badge = r => { const c = { owner: 'bg-[#0058A3] text-white', kasir: 'bg-blue-100 text-[#0058A3]', gudang: 'bg-gray-100 text-gray-700' }; return <span className={`px-2.5 py-1 rounded-md text-xs font-medium ${c[r] || c.kasir}`}>{r.toUpperCase()}</span> }
@@ -79,8 +91,8 @@ function TabUser() {
         </form>
       </Modal>
       <div className="bg-white rounded-xl border shadow-sm overflow-hidden"><div className="overflow-x-auto"><table className="w-full"><thead><tr className="bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase"><th className="text-left p-3">User</th><th className="text-left p-3">Email</th><th className="text-left p-3">Role</th><th className="text-left p-3">Hak Akses</th><th className="text-right p-3">Aksi</th></tr></thead>
-        <tbody className="divide-y">{users.map(u => (<tr key={u.id} className="hover:bg-gray-50"><td className="p-3"><div className="flex items-center gap-3"><div className="w-9 h-9 bg-gradient-to-br from-[#0058A3] to-[#004080] rounded-full flex items-center justify-center font-bold text-white text-sm">{u.username?.charAt(0).toUpperCase()}</div><span className="text-sm font-medium">{u.username}</span></div></td><td className="p-3 text-sm text-gray-600">{u.email || '-'}</td><td className="p-3">{badge(u.role)}</td><td className="p-3 text-xs text-gray-500">{u.role === 'owner' ? 'Semua modul' : u.role === 'kasir' ? 'POS, Riwayat, Barang, Garansi' : 'Master Barang saja'}</td><td className="p-3 text-right"><div className="flex justify-end gap-2"><button onClick={() => edit(u)} className="p-1.5 hover:bg-blue-50 rounded text-[#0058A3]"><Edit2 className="w-4 h-4"/></button><button onClick={() => del(u.id)} className="p-1.5 hover:bg-red-50 rounded text-red-600"><Trash2 className="w-4 h-4"/></button></div></td></tr>))}</tbody></table></div></div>
-      <Confirm open={!!cf} danger message={cf?.message} confirmText="Ya, Hapus" onClose={() => setCf(null)} onConfirm={async () => { const a = cf.action; setCf(null); await a() }}/>
+        <tbody className="divide-y">{users.map(u => (<tr key={u.id} className="hover:bg-gray-50"><td className="p-3"><div className="flex items-center gap-3"><div className="w-9 h-9 bg-gradient-to-br from-[#0058A3] to-[#004080] rounded-full flex items-center justify-center font-bold text-white text-sm">{u.username?.charAt(0).toUpperCase()}</div><span className="text-sm font-medium">{u.username}</span>{u.is_active === false && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-600 font-medium">nonaktif</span>}</div></td><td className="p-3 text-sm text-gray-600">{u.email || '-'}</td><td className="p-3">{badge(u.role)}</td><td className="p-3 text-xs text-gray-500">{u.role === 'owner' ? 'Semua modul' : u.role === 'kasir' ? 'POS, Riwayat, Barang, Garansi' : 'Master Barang saja'}</td><td className="p-3 text-right"><div className="flex justify-end gap-2"><button onClick={() => edit(u)} className="p-1.5 hover:bg-blue-50 rounded text-[#0058A3]"><Edit2 className="w-4 h-4"/></button><button onClick={() => toggleUser(u)} className="p-1.5 hover:bg-red-50 rounded text-red-600" title={u.is_active === false ? 'Aktifkan kembali' : 'Nonaktifkan'}>{u.is_active === false ? <RotateCcw className="w-4 h-4"/> : <Trash2 className="w-4 h-4"/>}</button></div></td></tr>))}</tbody></table></div></div>
+      <Confirm open={!!cf} danger message={cf?.message} confirmText={cf?.confirmText || 'Ya, Lanjut'} onClose={() => setCf(null)} onConfirm={async () => { const a = cf.action; setCf(null); await a() }}/>
     </div>
   )
 }
