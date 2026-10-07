@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { format, subDays, startOfDay, endOfDay } from 'date-fns'
+import { format, subDays, startOfDay } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { DollarSign, Package, TrendingUp, ShoppingCart, Layers, AlertTriangle, Archive, Wallet, Repeat } from 'lucide-react'
 const rp = n => new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(n||0)
@@ -12,16 +12,21 @@ export default function Dashboard() {
   useEffect(()=>{ run() },[])
   async function run(){
     const today=new Date()
-    const [txToday,allTx,prods,vars,imeis,cons]=await Promise.all([
-      supabase.from('transactions').select('total_amount, transaction_items(hpp_at_sale,qty)').gte('created_at',startOfDay(today).toISOString()).lte('created_at',endOfDay(today).toISOString()).eq('payment_status','paid'),
+    // FIX: 1 query untuk 7 hari (sebelumnya 7 query beruntun), lalu dikelompokkan di client
+    const [txWeek,allTx,prods,vars,imeis,cons]=await Promise.all([
+      supabase.from('transactions').select('total_amount, created_at, transaction_items(hpp_at_sale,qty)').gte('created_at',startOfDay(subDays(today,6)).toISOString()).eq('payment_status','paid'),
       supabase.from('transactions').select('id',{count:'exact',head:true}).eq('payment_status','paid'),
       supabase.from('products').select('id,name,category,stock_type,status').eq('status','active'),
       supabase.from('product_variants').select('id,product_id,storage,color,stock_qty'),
       supabase.from('product_imeis').select('variant_id,status'),
-      supabase.from('consignment_settlements').select('owner_share,store_share')
+      supabase.from('consignment_settlements').select('store_share').not('owner_share','is',null)
     ])
-    let sales=0,hpp=0
-    ;(txToday.data||[]).forEach(t=>{ sales+=+t.total_amount||0; (t.transaction_items||[]).forEach(i=>{ hpp+=(+i.hpp_at_sale||0)*(i.qty||1) }) })
+    const todayKey=format(today,'yyyy-MM-dd'); const byDay={}
+    let sales=0,hpp=0,txToday=0
+    ;(txWeek.data||[]).forEach(t=>{ const key=format(new Date(t.created_at),'yyyy-MM-dd'); const amt=+t.total_amount||0; byDay[key]=(byDay[key]||0)+amt
+      if(key===todayKey){ sales+=amt; txToday++; (t.transaction_items||[]).forEach(i=>{ hpp+=(+i.hpp_at_sale||0)*(i.qty||1) }) } })
+    const ch=[]
+    for(let i=6;i>=0;i--){ const d=subDays(today,i); ch.push({date:format(d,'dd MMM',{locale:id}), penjualan:byDay[format(d,'yyyy-MM-dd')]||0}) }
     const stMap={}; (prods.data||[]).forEach(p=>stMap[p.id]=p.stock_type)
     const nameMap={}; (prods.data||[]).forEach(p=>nameMap[p.id]=p.name)
     const catMap={}; (prods.data||[]).forEach(p=>catMap[p.id]=p.category)
@@ -32,9 +37,7 @@ export default function Dashboard() {
       else { const qq=+v.stock_qty||0; stock+=qq; if(qq<=5) low.push({ name:nameMap[v.product_id], cat:catMap[v.product_id], label:vlabel(v), sisa:qq, kind:'Menipis' }) }
     })
     const consShare=(cons.data||[]).reduce((a,c)=>a+(+c.store_share||0),0)
-    const ch=[]
-    for(let i=6;i>=0;i--){ const d=subDays(today,i); const r=await supabase.from('transactions').select('total_amount').gte('created_at',startOfDay(d).toISOString()).lte('created_at',endOfDay(d).toISOString()).eq('payment_status','paid'); ch.push({date:format(d,'dd MMM',{locale:id}), penjualan:(r.data||[]).reduce((a,t)=>a+(+t.total_amount||0),0)}) }
-    setS({sales,hpp,profit:sales-hpp,tx:(txToday.data||[]).length,totalTx:allTx.count||0,totalProd:(prods.data||[]).length,totalStock:stock,low:low.length,consignment:consShare})
+    setS({sales,hpp,profit:sales-hpp,tx:txToday,totalTx:allTx.count||0,totalProd:(prods.data||[]).length,totalStock:stock,low:low.length,consignment:consShare})
     setChart(ch); setLowList(low.sort((a,b)=>a.sisa-b.sisa)); setLoad(false)
   }
   const Card=({icon:I,label,value,delay,sub})=>(<div className={`bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all animate-fade-in ${delay}`}><div className="p-2.5 rounded-lg bg-blue-50 w-fit mb-4"><I className="w-5 h-5 text-[#0058A3]"/></div><p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1.5">{label}</p><p className="text-2xl font-bold text-gray-900">{value}</p>{sub&&<p className="text-[11px] text-gray-400 mt-1">{sub}</p>}</div>)
