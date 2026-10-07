@@ -1,4 +1,3 @@
-// >>> FILE App START
 import { useState } from 'react'
 import { ToastProvider } from './components/ui'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -51,9 +50,9 @@ function MainApp() {
     }
   }
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
       <Sidebar currentPage={page} setCurrentPage={setPage} />
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-full">
         <Header user={user} role={role} title={titles[page] || 'Dashboard'} showDateFilter={page === 'dashboard'} />
         <main className="flex-1 overflow-y-auto">{render()}</main>
       </div>
@@ -69,4 +68,3 @@ export default function App() {
     </ToastProvider>
   )
 }
-// <<< FILE App END
