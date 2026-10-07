@@ -1,147 +1,373 @@
+// >>> FILE Konsinyasi START
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import { useStoreSettings } from '../lib/useStoreSettings'
+import PageHeader from '../components/PageHeader'
 import { Confirm, Modal, RupiahInput, useToast, rp } from '../components/ui'
-import { Users, Package, FileText, Plus, Edit2, Trash2, Check, Printer, Wallet, Repeat, Calendar, Lock } from 'lucide-react'
+import {
+  Users, Package, FileText, Plus, Edit2, Trash2, Check,
+  Search, Wallet, Repeat, Calendar, ArrowDownToLine, ArrowUpFromLine
+} from 'lucide-react'
 import { format } from 'date-fns'
-import { id as localeId } from 'date-fns/locale'
 
-const thisMonth = () => format(new Date(), 'yyyy-MM')
-const monthRange = m => {
-  const [y, mo] = m.split('-').map(Number)
-  const s = new Date(y, mo - 1, 1, 0, 0, 0)
-  const e = new Date(y, mo - 1, 1, 23, 59, 59, 999); e.setMonth(e.getMonth() + 1); e.setDate(0)
-  return { from: s.toISOString(), to: e.toISOString(), label: format(s, 'MMMM yyyy', { locale: localeId }) }
-}
+const today = () => format(new Date(), 'yyyy-MM-dd')
+const startMonth = () => { const d = new Date(); d.setDate(1); return format(d, 'yyyy-MM-dd') }
 
 export default function Konsinyasi() {
-  const toast = useToast(); const ST = useStoreSettings()
-  const [tab, setTab] = useState('konsinyan')
-  const [owners, setOwners] = useState([])
-  const [items, setItems] = useState([]); const [itemStats, setItemStats] = useState({})
-  const [stmt, setStmt] = useState([]); const [stmtSummary, setStmtSummary] = useState({ owed: 0, paid: 0, margin: 0, outstanding: 0 })
-  const [month, setMonth] = useState(thisMonth())
-  const [loading, setLoading] = useState(false)
+  const toast = useToast()
+  const [partners, setPartners] = useState([])
+  const [moves, setMoves] = useState([])
+  const [settles, setSettles] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  const [showOwner, setShowOwner] = useState(false); const [editOwner, setEditOwner] = useState(null); const [fo, setFo] = useState({ name: '', phone: '', address: '' })
-  const [showItem, setShowItem] = useState(false); const [editItem, setEditItem] = useState(null); const [fi, setFi] = useState({ owner_id: '', name: '', stock_type: 'qty', qty_total: 1, consignor_price: 0, our_price: 0, start_date: format(new Date(), 'yyyy-MM-dd'), notes: '' })
-  const [showPay, setShowPay] = useState(false); const [payOwner, setPayOwner] = useState(null); const [fp, setFp] = useState({ amount: 0, note: '' })
-  const [cf, setCf] = useState(null); const ask = (message, action) => setCf({ message, action })
+  const [showPartner, setShowPartner] = useState(false)
+  const [editPartner, setEditPartner] = useState(null)
+  const [fp, setFp] = useState({ name: '', phone: '', address: '' })
 
-  useEffect(() => { loadOwners() }, [])
-  useEffect(() => { if (tab === 'barang') loadItems(); if (tab === 'laporan') loadStmt(month) }, [tab, month])
+  const [showMove, setShowMove] = useState(false)
+  const [editMove, setEditMove] = useState(null)
+  const [fm, setFm] = useState({ partner_id: '', direction: 'in', item_name: '', qty: 1, unit_price: 0, note: '', move_date: today() })
 
-  async function loadOwners() {
-    const { data, error } = await supabase.from('consignment_owners').select('*').order('name')
-    if (error) toast.error('Ambil konsinyan: ' + error.message)
-    setOwners(data || [])
-  }
-  async function loadItems() {
+  const [showSettle, setShowSettle] = useState(false)
+  const [editSettle, setEditSettle] = useState(null)
+  const [fs, setFs] = useState({ partner_id: '', direction: 'in', amount: 0, note: '', settle_date: today() })
+
+  const [hq, setHq] = useState('')
+  const [from, setFrom] = useState(startMonth())
+  const [to, setTo] = useState(today())
+  const [dirFilter, setDirFilter] = useState('all')
+
+  const [cf, setCf] = useState(null)
+  const ask = (message, action) => setCf({ message, action })
+
+  useEffect(() => { load() }, [])
+
+  async function load() {
     setLoading(true)
-    const { data, error } = await supabase.from('consignment_items').select('*, consignment_owners(name)').order('created_at', { ascending: false })
-    if (error) { toast.error('Ambil barang titipan: ' + error.message); setLoading(false); return }
-    setItems(data || [])
-    const { data: txs, error: e2 } = await supabase.from('transactions').select('created_at, transaction_items(product_id, imei, qty, price_at_sale, hpp_at_sale)').eq('payment_status', 'paid').order('created_at', { ascending: false })
-    if (e2) toast.error('Ambil penjualan: ' + e2.message)
-    const v2item = {}; (data || []).forEach(it => { if (it.variant_id) v2item[it.variant_id] = it.id })
-    const stats = {}; (data || []).forEach(it => { stats[it.id] = { sold: 0, owed: 0, gross: 0, margin: 0 } })
-    ;(txs || []).forEach(t => (t.transaction_items || []).forEach(i => {
-      const iid = v2item[i.product_id]; if (!iid) return
-      const q = +i.qty || 1; const s = stats[iid]
-      s.sold += q; s.owed += (+i.hpp_at_sale || 0) * q; s.gross += (+i.price_at_sale || 0) * q; s.margin += ((+i.price_at_sale || 0) - (+i.hpp_at_sale || 0)) * q
-    }))
-    setItemStats(stats); setLoading(false)
-  }
-  async function loadStmt(m) {
-    setLoading(true)
-    const r = monthRange(m)
-    const [itRes, txRes, payMonth, payAll] = await Promise.all([
-      supabase.from('consignment_items').select('*, consignment_owners(id,name)'),
-      supabase.from('transactions').select('created_at, transaction_items(product_id, imei, qty, price_at_sale, hpp_at_sale)').eq('payment_status', 'paid').gte('created_at', r.from).lte('created_at', r.to),
-      supabase.from('consignment_payments').select('owner_id, amount').eq('period_month', m),
-      supabase.from('consignment_payments').select('owner_id, amount')
+    const [p, m, s] = await Promise.all([
+      supabase.from('consignment_partners').select('*').order('name'),
+      supabase.from('consignment_moves').select('*').order('move_date', { ascending: false }),
+      supabase.from('consignment_settlements').select('*').order('settle_date', { ascending: false })
     ])
-    if (itRes.error) toast.error('Ambil item: ' + itRes.error.message)
-    if (txRes.error) toast.error('Ambil transaksi: ' + txRes.error.message)
-    const itemsArr = itRes.data || []
-    const v2item = {}; itemsArr.forEach(it => { if (it.variant_id) v2item[it.variant_id] = it })
-    const byOwner = {}; const ensure = o => (byOwner[o.id] = byOwner[o.id] || { id: o.id, name: o.name, units: 0, gross: 0, owed: 0, margin: 0, lines: {} })
-    itemsArr.forEach(it => ensure(it.consignment_owners || { id: it.owner_id, name: '?' }))
-    ;(txRes.data || []).forEach(t => (t.transaction_items || []).forEach(i => {
-      const it = v2item[i.product_id]; if (!it) return
-      const o = it.consignment_owners || { id: it.owner_id, name: '?' }; const b = ensure(o)
-      const q = +i.qty || 1; const owed = (+i.hpp_at_sale || 0) * q; const gross = (+i.price_at_sale || 0) * q
-      b.units += q; b.owed += owed; b.gross += gross; b.margin += gross - owed
-      const L = b.lines[it.id] = b.lines[it.id] || { name: it.name, units: 0, consignor_price: +it.consignor_price || 0, our_price: +it.our_price || 0, owed: 0, gross: 0 }
-      L.units += q; L.owed += owed; L.gross += gross
-    }))
-    const paidM = {}; (payMonth.data || []).forEach(p => paidM[p.owner_id] = (paidM[p.owner_id] || 0) + (+p.amount || 0))
-    const paidAll = {}; (payAll.data || []).forEach(p => paidAll[p.owner_id] = (paidAll[p.owner_id] || 0) + (+p.amount || 0))
-    const { data: txAll } = await supabase.from('transactions').select('transaction_items(product_id, qty, hpp_at_sale)').eq('payment_status', 'paid')
-    const owedAll = {}; (txAll || []).forEach(t => (t.transaction_items || []).forEach(i => { const it = v2item[i.product_id]; if (it) { const oid = (it.consignment_owners || {}).id || it.owner_id; owedAll[oid] = (owedAll[oid] || 0) + (+i.hpp_at_sale || 0) * (+i.qty || 1) } }))
-    const rows = Object.values(byOwner).map(b => ({ ...b, paid_month: paidM[b.id] || 0, paid_all: paidAll[b.id] || 0, owed_all: owedAll[b.id] || 0, sisa_month: Math.max(0, b.owed - (paidM[b.id] || 0)), outstanding: Math.max(0, (owedAll[b.id] || 0) - (paidAll[b.id] || 0)) }))
-    rows.sort((a, b) => b.owed - a.owed)
-    setStmt(rows)
-    setStmtSummary({ owed: rows.reduce((a, x) => a + x.owed, 0), paid: rows.reduce((a, x) => a + x.paid_month, 0), margin: rows.reduce((a, x) => a + x.margin, 0), outstanding: rows.reduce((a, x) => a + x.outstanding, 0) })
+    if (p.error) toast.error('Mitra: ' + p.error.message)
+    if (m.error) toast.error('Mutasi: ' + m.error.message)
+    if (s.error) toast.error('Pembayaran: ' + s.error.message)
+    setPartners(p.data || [])
+    setMoves(m.data || [])
+    setSettles(s.data || [])
     setLoading(false)
   }
 
-  async function saveOwner(e) {
-    e.preventDefault(); if (!fo.name.trim()) return toast.error('Nama konsinyan wajib diisi')
-    const payload = { name: fo.name.trim(), phone: fo.phone, address: fo.address }
-    try { if (editOwner) { const { error } = await supabase.from('consignment_owners').update(payload).eq('id', editOwner.id); if (error) throw error; toast.success('Konsinyan diupdate') } else { const { error } = await supabase.from('consignment_owners').insert(payload); if (error) throw error; toast.success('Konsinyan ditambahkan') } setShowOwner(false); setEditOwner(null); setFo({ name: '', phone: '', address: '' }); loadOwners() } catch (err) { toast.error(err.message) }
+  function balance(pid) {
+    const inSum = moves.filter(x => x.partner_id === pid && x.direction === 'in').reduce((a, x) => a + (+x.total || 0), 0)
+    const outSum = moves.filter(x => x.partner_id === pid && x.direction === 'out').reduce((a, x) => a + (+x.total || 0), 0)
+    const payIn = settles.filter(x => x.partner_id === pid && x.direction === 'in').reduce((a, x) => a + (+x.amount || 0), 0)
+    const payOut = settles.filter(x => x.partner_id === pid && x.direction === 'out').reduce((a, x) => a + (+x.amount || 0), 0)
+    return { hutang: inSum - payIn, piutang: outSum - payOut }
   }
-  function delOwner(id) { ask('Hapus konsinyan ini? Barang titipannya juga hilang dari daftar (katalog & riwayat tetap aman).', async () => { const { error } = await supabase.from('consignment_owners').delete().eq('id', id); if (error) toast.error(error.message); else toast.success('Konsinyan dihapus'); loadOwners(); if (tab === 'barang') loadItems() }) }
+  const pname = id => (partners.find(x => x.id === id) || {}).name || '—'
 
-  async function saveItem(e) {
+  // ---- partner ----
+  function openAddPartner() { setEditPartner(null); setFp({ name: '', phone: '', address: '' }); setShowPartner(true) }
+  function openEditPartner(o) { setEditPartner(o); setFp({ name: o.name, phone: o.phone || '', address: o.address || '' }); setShowPartner(true) }
+  async function savePartner(e) {
     e.preventDefault()
-    if (!fi.owner_id) return toast.error('Pilih konsinyan')
-    if (!fi.name.trim()) return toast.error('Nama barang wajib diisi')
-    if (+fi.qty_total <= 0) return toast.error('Jumlah unit harus > 0')
-    if (+fi.our_price <= 0) return toast.error('Harga kita jual harus > 0')
+    if (!fp.name.trim()) return toast.error('Nama mitra wajib diisi')
+    const payload = { name: fp.name.trim(), phone: fp.phone, address: fp.address }
     try {
-      if (editItem) {
-        const { error } = await supabase.from('consignment_items').update({ name: fi.name.trim(), consignor_price: +fi.consignor_price || 0, our_price: +fi.our_price || 0, notes: fi.notes, status: editItem.status }).eq('id', editItem.id)
+      if (editPartner) {
+        const { error } = await supabase.from('consignment_partners').update(payload).eq('id', editPartner.id)
         if (error) throw error
-        if (editItem.variant_id) await supabase.from('product_variants').update({ harga_jual: +fi.our_price || 0, hpp: +fi.consignor_price || 0 }).eq('id', editItem.variant_id)
-        toast.success('Barang titipan diupdate'); setShowItem(false); setEditItem(null); resetItem(); loadItems(); return
+        toast.success('Mitra diupdate')
+      } else {
+        const { error } = await supabase.from('consignment_partners').insert(payload)
+        if (error) throw error
+        toast.success('Mitra ditambahkan')
       }
-      const { data: item, error: e0 } = await supabase.from('consignment_items').insert({ owner_id: fi.owner_id, name: fi.name.trim(), stock_type: fi.stock_type, qty_total: +fi.qty_total, consignor_price: +fi.consignor_price || 0, our_price: +fi.our_price || 0, start_date: fi.start_date, notes: fi.notes }).select().single()
-      if (e0) throw e0
-      const { data: prod, error: e1 } = await supabase.from('products').insert({ name: fi.name.trim(), category: 'Konsinyasi', stock_type: fi.stock_type, type: 'consignment', status: 'active', consignment_owner_id: fi.owner_id, consignment_split: null }).select().single()
-      if (e1) throw e1
-      const { data: varr, error: e2 } = await supabase.from('product_variants').insert({ product_id: prod.id, storage: '-', color: fi.name.trim().slice(0, 40), harga_jual: +fi.our_price || 0, hpp: +fi.consignor_price || 0, stock_qty: fi.stock_type === 'qty' ? +fi.qty_total : 0, consignment_item_id: item.id }).select().single()
-      if (e2) throw e2
-      if (fi.stock_type === 'imei') { const arr = Array.from({ length: +fi.qty_total }, (_, i) => `CON-${Date.now()}-${i + 1}`); await supabase.from('product_imeis').insert(arr.map(im => ({ variant_id: varr.id, imei: im, status: 'available' }))) }
-      await supabase.from('consignment_items').update({ product_id: prod.id, variant_id: varr.id }).eq('id', item.id)
-      toast.success('Barang titipan terdaftar & siap dijual di POS'); setShowItem(false); resetItem(); loadItems()
-    } catch (err) { toast.error('Gagal: ' + err.message) }
+      setShowPartner(false); setEditPartner(null); load()
+    } catch (err) { toast.error(err.message) }
   }
-  function resetItem() { setFi({ owner_id: owners[0]?.id || '', name: '', stock_type: 'qty', qty_total: 1, consignor_price: 0, our_price: 0, start_date: format(new Date(), 'yyyy-MM-dd'), notes: '' }) }
-  function editItemFn(it) { setEditItem(it); setFi({ owner_id: it.owner_id, name: it.name, stock_type: it.stock_type, qty_total: it.qty_total, consignor_price: it.consignor_price, our_price: it.our_price, start_date: it.start_date, notes: it.notes || '' }); setShowItem(true) }
-  async function toggleItem(it) { const ns = it.status === 'active' ? 'closed' : 'active'; const { error } = await supabase.from('consignment_items').update({ status: ns }).eq('id', it.id); if (error) toast.error(error.message); else { toast.success(ns === 'closed' ? 'Ditutup' : 'Dibuka kembali'); if (it.product_id) await supabase.from('products').update({ status: ns === 'closed' ? 'inactive' : 'active' }).eq('id', it.product_id); loadItems() } }
-  function delItem(it) {
-    ask(`Hapus "${it.name}" dari daftar titipan?${it.variant_id ? '\nSistem cek dulu: kalau sudah ada yang terjual, tidak bisa dihapus (riwayat harus utuh).' : ''}`, async () => {
-      try {
-        if (it.variant_id) { const { count } = await supabase.from('transaction_items').select('id', { count: 'exact', head: true }).eq('product_id', it.variant_id); if ((count || 0) > 0) return toast.error('Tidak bisa dihapus — sudah ada penjualan terkait. Tutup saja statusnya.') }
-        if (it.product_id) await supabase.from('products').delete().eq('id', it.product_id)
-        const { error } = await supabase.from('consignment_items').delete().eq('id', it.id); if (error) throw error
-        toast.success('Barang titipan dihapus'); loadItems()
-      } catch (err) { toast.error(err.message) }
+  function delPartner(id) {
+    ask('Hapus mitra ini? Seluruh mutasi & pembayarannya ikut terhapus.', async () => {
+      const { error } = await supabase.from('consignment_partners').delete().eq('id', id)
+      if (error) toast.error(error.message)
+      else toast.success('Mitra dihapus')
+      load()
     })
   }
 
-  async function savePay(e) {
-    e.preventDefault(); if (!payOwner || !+fp.amount) return toast.error('Nominal pembayaran wajib diisi')
-    try { const { error } = await supabase.from('consignment_payments').insert({ owner_id: payOwner.id, amount: +fp.amount, period_month: month, note: fp.note }); if (error) throw error; toast.success('Pembayaran tercatat'); setShowPay(false); setPayOwner(null); setFp({ amount: 0, note: '' }); loadStmt(month) } catch (err) { toast.error(err.message) }
+  // ---- move (titip masuk / keluar) ----
+  function openMove(direction, pid) {
+    setEditMove(null)
+    setFm({ partner_id: pid || partners[0]?.id || '', direction, item_name: '', qty: 1, unit_price: 0, note: '', move_date: today() })
+    setShowMove(true)
   }
-  function printStmt(row) {
-    const r = monthRange(month); const lines = Object.values(row.lines || {})
-    const body = lines.map(L => `<tr><td>${L.name}</td><td style="text-align:right">${L.units}</td><td style="text-align:right">${rp(L.consignor_price)}</td><td style="text-align:right">${rp(L.our_price)}</td><td style="text-align:right">${rp(L.owed)}</td></tr>`).join('')
-    const w = window.open('', '_blank', 'width=720,height=900'); if (!w) return toast.error('Izinkan pop-up untuk cetak')
-    w.document.write(`<html><head><title>Laporan Konsinyasi ${row.name} ${r.label}</title><style>body{font-family:Arial,sans-serif;font-size:13px;color:#111;padding:24px;max-width:680px;margin:0 auto}h1{font-size:18px;margin:0}.muted{color:#555;font-size:12px}table{width:100%;border-collapse:collapse;margin:14px 0}th,td{border:1px solid #ccc;padding:6px 8px;font-size:12px}th{background:#f3f4f6;text-align:left}.tot td{font-weight:bold;border-top:2px solid #111}.sig{margin-top:48px;display:flex;justify-content:space-between}.sig div{text-align:center}.line{display:inline-block;width:180px;border-top:1px solid #111;margin-top:36px}</style></head><body>
-      <h1>${ST.store_name || 'TOKO'}</h1><div class="muted">${ST.address || ''} ${ST.whatsapp ? '· ' + ST.whatsapp : ''}</div>
-      <h2 style="font-size:15px;margin:18px 0 4px">LAPORAN KONSINYASI — ${r.label}</h2>
-      <div>Kepada Yth. <strong>${row.name}</strong> (Konsinyan)</div>
-      <table><thead><tr><th>Barang Titipan</th><th style="text-align:right">Unit Terjual</th><th style="text-align:right">Harga Dari Anda /unit</th><th style="text-align:right">Harga Kami Jual /unit</th><th style="text-align:right">Kewajiban Kami</th></tr></thead><tbody>${body || '<tr><td colspan="5" style="text-align:center;color:#888">Tidak ada penjualan bulan ini</td></tr>'}</tbody>
-      <tfoot><tr class="
+  function openEditMove(mv) {
+    setEditMove(mv)
+    setFm({ partner_id: mv.partner_id, direction: mv.direction, item_name: mv.item_name, qty: mv.qty, unit_price: mv.unit_price, note: mv.note || '', move_date: mv.move_date })
+    setShowMove(true)
+  }
+  async function saveMove(e) {
+    e.preventDefault()
+    if (!fm.partner_id) return toast.error('Pilih mitra')
+    if (!fm.item_name.trim()) return toast.error('Nama barang wajib diisi')
+    if (+fm.qty <= 0) return toast.error('Jumlah harus > 0')
+    if (+fm.unit_price <= 0) return toast.error('Harga harus > 0')
+    const total = (+fm.qty) * (+fm.unit_price)
+    const payload = { partner_id: fm.partner_id, direction: fm.direction, item_name: fm.item_name.trim(), qty: +fm.qty, unit_price: +fm.unit_price, total, note: fm.note, move_date: fm.move_date }
+    try {
+      if (editMove) {
+        const { error } = await supabase.from('consignment_moves').update(payload).eq('id', editMove.id)
+        if (error) throw error
+        toast.success('Mutasi diupdate')
+      } else {
+        const { error } = await supabase.from('consignment_moves').insert(payload)
+        if (error) throw error
+        toast.success(fm.direction === 'in' ? 'Titip masuk tercatat (hutang +)' : 'Titip keluar tercatat (piutang +)')
+      }
+      setShowMove(false); setEditMove(null); load()
+    } catch (err) { toast.error(err.message) }
+  }
+  function delMove(id) {
+    ask('Hapus mutasi ini?', async () => {
+      const { error } = await supabase.from('consignment_moves').delete().eq('id', id)
+      if (error) toast.error(error.message)
+      else toast.success('Mutasi dihapus')
+      load()
+    })
+  }
+
+  // ---- settle (lunas / pembayaran) ----
+  function openSettle(direction, pid, suggested) {
+    setEditSettle(null)
+    setFs({ partner_id: pid || partners[0]?.id || '', direction, amount: suggested || 0, note: '', settle_date: today() })
+    setShowSettle(true)
+  }
+  function openEditSettle(st) {
+    setEditSettle(st)
+    setFs({ partner_id: st.partner_id, direction: st.direction, amount: st.amount, note: st.note || '', settle_date: st.settle_date })
+    setShowSettle(true)
+  }
+  async function saveSettle(e) {
+    e.preventDefault()
+    if (!fs.partner_id) return toast.error('Pilih mitra')
+    if (+fs.amount <= 0) return toast.error('Nominal harus > 0')
+    const payload = { partner_id: fs.partner_id, direction: fs.direction, amount: +fs.amount, note: fs.note, settle_date: fs.settle_date }
+    try {
+      if (editSettle) {
+        const { error } = await supabase.from('consignment_settlements').update(payload).eq('id', editSettle.id)
+        if (error) throw error
+        toast.success('Pembayaran diupdate')
+      } else {
+        const { error } = await supabase.from('consignment_settlements').insert(payload)
+        if (error) throw error
+        toast.success(fs.direction === 'in' ? 'Pembayaran ke mitra tercatat (hutang -)' : 'Penerimaan dari mitra tercatat (piutang -)')
+      }
+      setShowSettle(false); setEditSettle(null); load()
+    } catch (err) { toast.error(err.message) }
+  }
+  function delSettle(id) {
+    ask('Hapus catatan pembayaran ini?', async () => {
+      const { error } = await supabase.from('consignment_settlements').delete().eq('id', id)
+      if (error) toast.error(error.message)
+      else toast.success('Pembayaran dihapus')
+      load()
+    })
+  }
+
+  // ---- riwayat gabungan + filter ----
+  const history = [
+    ...moves.map(x => ({ _k: 'move', _id: x.id, date: x.move_date, partner_id: x.partner_id, direction: x.direction, label: x.item_name, qty: x.qty, amount: x.total, note: x.note })),
+    ...settles.map(x => ({ _k: 'settle', _id: x.id, date: x.settle_date, partner_id: x.partner_id, direction: x.direction, label: '(pembayaran)', qty: null, amount: x.amount, note: x.note }))
+  ]
+    .filter(h => {
+      if (h.date < from || h.date > to) return false
+      if (dirFilter !== 'all' && h.direction !== dirFilter) return false
+      if (hq && !(pname(h.partner_id).toLowerCase().includes(hq.toLowerCase()) || (h.label || '').toLowerCase().includes(hq.toLowerCase()))) return false
+      return true
+    })
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
+
+  if (loading) return <div className="p-8 flex justify-center"><div className="w-8 h-8 border-4 border-[#0058A3] border-t-transparent rounded-full animate-spin" /></div>
+
+  const actions = (
+    <button onClick={() => openMove('out')} className="flex items-center gap-2 px-4 py-2 bg-[#0058A3] text-white rounded-lg hover:bg-[#004080] shadow-sm text-sm font-medium">
+      <Plus className="w-4 h-4" />Kirim Barang (Titip Keluar)
+    </button>
+  )
+
+  return (
+    <div className="p-6 lg:p-8">
+      <PageHeader subtitle="Kelola hutang & piutang dengan mitra/supplier" actions={actions} />
+
+      {/* DAFTAR MITRA */}
+      <div className="bg-white rounded-xl border shadow-sm p-5 mb-6">
+        <h3 className="font-bold text-lg mb-4">Daftar Mitra</h3>
+        <div className="flex gap-2 mb-4 flex-wrap">
+          <input value={fp.name} onChange={e => setFp({ ...fp, name: e.target.value })} placeholder="Nama Mitra / Supplier" className="flex-1 min-w-[180px] px-4 py-2.5 border rounded-full outline-none focus:ring-2 focus:ring-[#0058A3] text-sm" />
+          <input value={fp.phone} onChange={e => setFp({ ...fp, phone: e.target.value })} placeholder="No. WhatsApp" className="flex-1 min-w-[160px] px-4 py-2.5 border rounded-full outline-none focus:ring-2 focus:ring-[#0058A3] text-sm" />
+          <button onClick={savePartner} className="px-4 py-2.5 bg-gray-900 text-white rounded-full text-sm font-medium hover:bg-black flex items-center gap-1"><Plus className="w-4 h-4" />Tambah Mitra</button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead><tr className="bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase">
+              <th className="text-left p-3">Nama Mitra</th>
+              <th className="text-left p-3">No. Telp</th>
+              <th className="text-right p-3">Hutang (Titip Masuk)</th>
+              <th className="text-right p-3">Piutang (Titip Keluar)</th>
+              <th className="text-right p-3">Aksi</th>
+            </tr></thead>
+            <tbody className="divide-y">
+              {partners.map(o => {
+                const b = balance(o.id)
+                return (
+                  <tr key={o.id} className="hover:bg-gray-50">
+                    <td className="p-3 text-sm font-medium flex items-center gap-2"><Users className="w-4 h-4 text-gray-400" />{o.name}</td>
+                    <td className="p-3 text-sm text-gray-600">{o.phone || '—'}</td>
+                    <td className="p-3 text-sm text-right font-semibold text-amber-700">{rp(b.hutang)}</td>
+                    <td className="p-3 text-sm text-right font-semibold text-[#0058A3]">{rp(b.piutang)}</td>
+                    <td className="p-3 text-right">
+                      <div className="flex justify-end gap-1 flex-wrap">
+                        <button onClick={() => openMove('in', o.id)} className="px-2 py-1 text-xs border rounded-lg hover:bg-gray-50 text-amber-700 flex items-center gap-1"><ArrowDownToLine className="w-3.5 h-3.5" />Masuk</button>
+                        <button onClick={() => openMove('out', o.id)} className="px-2 py-1 text-xs border rounded-lg hover:bg-gray-50 text-[#0058A3] flex items-center gap-1"><ArrowUpFromLine className="w-3.5 h-3.5" />Keluar</button>
+                        <button onClick={() => openSettle('in', o.id, b.hutang)} className="px-2 py-1 text-xs border rounded-lg hover:bg-gray-50 text-gray-700 flex items-center gap-1"><Wallet className="w-3.5 h-3.5" />Lunas</button>
+                        <button onClick={() => openEditPartner(o)} className="p-1.5 hover:bg-blue-50 rounded text-[#0058A3]"><Edit2 className="w-4 h-4" /></button>
+                        <button onClick={() => delPartner(o.id)} className="p-1.5 hover:bg-red-50 rounded text-red-600"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+              {!partners.length && <tr><td colSpan={5} className="p-10 text-center text-gray-400 text-sm">Belum ada mitra</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* RIWAYAT & MUTASI + FILTER TANGGAL */}
+      <div className="bg-white rounded-xl border shadow-sm p-5">
+        <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><FileText className="w-5 h-5 text-[#0058A3]" />Riwayat & Mutasi</h3>
+        <div className="flex gap-2 mb-4 flex-wrap items-center">
+          <Calendar className="w-4 h-4 text-gray-400" />
+          <input type="date" value={from} onChange={e => setFrom(e.target.value)} className="text-sm border rounded px-2 py-1.5 outline-none focus:ring-2 focus:ring-[#0058A3]" />
+          <span className="text-gray-400">s/d</span>
+          <input type="date" value={to} onChange={e => setTo(e.target.value)} className="text-sm border rounded px-2 py-1.5 outline-none focus:ring-2 focus:ring-[#0058A3]" />
+          <button onClick={() => { setFrom(startMonth()); setTo(today()) }} className="px-3 py-1.5 bg-gray-100 rounded-lg text-xs font-medium hover:bg-gray-200">Bulan Ini</button>
+          <select value={dirFilter} onChange={e => setDirFilter(e.target.value)} className="text-sm border rounded px-2 py-1.5 bg-white">
+            <option value="all">Semua arah</option>
+            <option value="in">Titip Masuk</option>
+            <option value="out">Titip Keluar</option>
+          </select>
+          <div className="flex-1 min-w-[160px] relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input value={hq} onChange={e => setHq(e.target.value)} placeholder="Cari mitra / barang..." className="w-full pl-9 pr-3 py-1.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#0058A3]" />
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead><tr className="bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase">
+              <th className="text-left p-3">Tanggal</th>
+              <th className="text-left p-3">Mitra</th>
+              <th className="text-left p-3">Arah</th>
+              <th className="text-left p-3">Barang / Ket</th>
+              <th className="text-right p-3">Qty</th>
+              <th className="text-right p-3">Nominal</th>
+              <th className="text-right p-3">Aksi</th>
+            </tr></thead>
+            <tbody className="divide-y">
+              {history.map(h => (
+                <tr key={h._k + h._id} className="hover:bg-gray-50">
+                  <td className="p-3 text-sm text-gray-600 whitespace-nowrap">{h.date}</td>
+                  <td className="p-3 text-sm font-medium">{pname(h.partner_id)}</td>
+                  <td className="p-3">
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${h.direction === 'in' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-[#0058A3]'}`}>
+                      {h.direction === 'in' ? 'MASUK' : 'KELUAR'}{h._k === 'settle' ? ' · bayar' : ''}
+                    </span>
+                  </td>
+                  <td className="p-3 text-sm text-gray-700 max-w-[240px] truncate">{h.label}{h.note ? <span className="block text-[11px] text-gray-400 truncate">{h.note}</span> : null}</td>
+                  <td className="p-3 text-sm text-right">{h.qty ?? '—'}</td>
+                  <td className="p-3 text-sm text-right font-semibold">{rp(h.amount)}</td>
+                  <td className="p-3 text-right">
+                    <div className="flex justify-end gap-1">
+                      {h._k === 'move'
+                        ? <><button onClick={() => openEditMove(moves.find(x => x.id === h._id))} className="p-1.5 hover:bg-blue-50 rounded text-[#0058A3]"><Edit2 className="w-4 h-4" /></button><button onClick={() => delMove(h._id)} className="p-1.5 hover:bg-red-50 rounded text-red-600"><Trash2 className="w-4 h-4" /></button></>
+                        : <><button onClick={() => openEditSettle(settles.find(x => x.id === h._id))} className="p-1.5 hover:bg-blue-50 rounded text-[#0058A3]"><Edit2 className="w-4 h-4" /></button><button onClick={() => delSettle(h._id)} className="p-1.5 hover:bg-red-50 rounded text-red-600"><Trash2 className="w-4 h-4" /></button></>}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {!history.length && <tr><td colSpan={7} className="p-10 text-center text-gray-400 text-sm">Tidak ada mutasi pada rentang ini.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* MODAL MITRA (edit) */}
+      <Modal open={showPartner} onClose={() => setShowPartner(false)} title={editPartner ? 'Edit Mitra' : 'Tambah Mitra'}
+        footer={<button form="ptForm" type="submit" className="w-full py-2.5 bg-[#0058A3] text-white rounded-lg font-medium flex items-center justify-center gap-2"><Check className="w-4 h-4" />{editPartner ? 'Update' : 'Simpan'}</button>}>
+        <form id="ptForm" onSubmit={savePartner} className="space-y-3">
+          <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Nama Mitra / Supplier *</label><input required value={fp.name} onChange={e => setFp({ ...fp, name: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-[#0058A3]" /></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1.5">No. WhatsApp</label><input value={fp.phone} onChange={e => setFp({ ...fp, phone: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-[#0058A3]" /></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Alamat</label><input value={fp.address} onChange={e => setFp({ ...fp, address: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-[#0058A3]" /></div>
+        </form>
+      </Modal>
+
+      {/* MODAL MUTASI */}
+      <Modal open={showMove} onClose={() => setShowMove(false)} title={editMove ? 'Edit Mutasi' : (fm.direction === 'in' ? 'Titip Masuk (kita hutang)' : 'Titip Keluar (mitra piutang)')}
+        footer={<button form="mvForm" type="submit" className="w-full py-2.5 bg-[#0058A3] text-white rounded-lg font-medium flex items-center justify-center gap-2"><Check className="w-4 h-4" />Simpan</button>}>
+        <form id="mvForm" onSubmit={saveMove} className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Mitra *</label>
+              <select required value={fm.partner_id} onChange={e => setFm({ ...fm, partner_id: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#0058A3]">
+                <option value="">— pilih —</option>
+                {partners.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+              </select>
+            </div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Arah *</label>
+              <select value={fm.direction} onChange={e => setFm({ ...fm, direction: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#0058A3]">
+                <option value="in">Titip Masuk (hutang kita)</option>
+                <option value="out">Titip Keluar (piutang kita)</option>
+              </select>
+            </div>
+          </div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Nama Barang *</label><input required value={fm.item_name} onChange={e => setFm({ ...fm, item_name: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-[#0058A3]" placeholder="cth: iPhone 12 128GB Hitam" /></div>
+          <div className="grid grid-cols-3 gap-3">
+            <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Qty *</label><input type="number" min="1" required value={fm.qty} onChange={e => setFm({ ...fm, qty: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-[#0058A3]" /></div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Harga /unit *</label><RupiahInput value={fm.unit_price} onChange={x => setFm({ ...fm, unit_price: x })} className="w-full px-4 py-2.5 border rounded-lg outline-none text-right focus:ring-2 focus:ring-[#0058A3]" placeholder="0" /></div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Tanggal *</label><input type="date" value={fm.move_date} onChange={e => setFm({ ...fm, move_date: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-[#0058A3]" /></div>
+          </div>
+          <div className="bg-gray-50 rounded p-2 text-sm flex justify-between"><span className="text-gray-600">Total</span><span className="font-bold text-[#0058A3]">{rp((+fm.qty || 0) * (+fm.unit_price || 0))}</span></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Catatan</label><textarea value={fm.note} onChange={e => setFm({ ...fm, note: e.target.value })} rows={2} className="w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-[#0058A3]" placeholder="Opsional" /></div>
+        </form>
+      </Modal>
+
+      {/* MODAL LUNAS / PEMBAYARAN */}
+      <Modal open={showSettle} onClose={() => setShowSettle(false)} title={editSettle ? 'Edit Pembayaran' : (fs.direction === 'in' ? 'Bayar ke Mitra (kurangi hutang)' : 'Terima dari Mitra (kurangi piutang)')}
+        footer={<button form="stForm" type="submit" className="w-full py-2.5 bg-[#0058A3] text-white rounded-lg font-medium flex items-center justify-center gap-2"><Check className="w-4 h-4" />Simpan</button>}>
+        <form id="stForm" onSubmit={saveSettle} className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Mitra *</label>
+              <select required value={fs.partner_id} onChange={e => setFs({ ...fs, partner_id: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#0058A3]">
+                <option value="">— pilih —</option>
+                {partners.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+              </select>
+            </div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Untuk *</label>
+              <select value={fs.direction} onChange={e => setFs({ ...fs, direction: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#0058A3]">
+                <option value="in">Lunas hutang (kita bayar)</option>
+                <option value="out">Piutang dibayar mitra</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Nominal (Rp) *</label><RupiahInput value={fs.amount} onChange={x => setFs({ ...fs, amount: x })} className="w-full px-4 py-2.5 border rounded-lg outline-none text-right focus:ring-2 focus:ring-[#0058A3]" placeholder="0" /></div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Tanggal *</label><input type="date" value={fs.settle_date} onChange={e => setFs({ ...fs, settle_date: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-[#0058A3]" /></div>
+          </div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Catatan</label><input value={fs.note} onChange={e => setFs({ ...fs, note: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-[#0058A3]" placeholder="cth: transfer BCA / tunai" /></div>
+        </form>
+      </Modal>
+
+      <Confirm open={!!cf} danger message={cf?.message} confirmText="Ya, Hapus" onClose={() => setCf(null)} onConfirm={async () => { const a = cf.action; setCf(null); await a() }} />
+    </div>
+  )
+}
+// <<< FILE Konsinyasi END
