@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ToastProvider } from './components/ui'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { useStoreSettings } from './lib/useStoreSettings'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import POSKasir from './pages/POSKasir'
@@ -15,6 +16,19 @@ import KeuntunganModal from './pages/KeuntunganModal'
 import Settings from './pages/Settings'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
+
+// Favicon tab browser mengikuti logo toko dari Pengaturan
+function FaviconSync() {
+  const ST = useStoreSettings()
+  useEffect(() => {
+    const url = ST.logo_sidebar_url || ST.logo_struk_url
+    if (!url) return
+    let link = document.querySelector("link[rel~='icon']")
+    if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link) }
+    link.href = url + '?t=' + Date.now() // cache-buster biar ganti logo langsung terlihat
+  }, [ST.logo_sidebar_url, ST.logo_struk_url])
+  return null
+}
 
 function MainApp() {
   const { user, role } = useAuth()
@@ -62,6 +76,7 @@ function MainApp() {
 export default function App() {
   return (
     <ToastProvider>
+      <FaviconSync />
       <AuthProvider>
         <MainApp />
       </AuthProvider>
