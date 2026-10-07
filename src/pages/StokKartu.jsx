@@ -82,16 +82,26 @@ export default function StokKartu() {
         if (fm.direction === 'in') {
           const toInsert = list.filter(im => !existImeis.includes(im))
           const toRevive = list.filter(im => existImeis.includes(im))
-          if (toInsert.length) await supabase.from('product_imeis').insert(toInsert.map(im => ({ variant_id: vrow.id, imei: im, status: 'available' })))
-          if (toRevive.length) await supabase.from('product_imeis').update({ status: 'available' }).in('imei', toRevive)
-          await supabase.from('stock_movements').insert(list.map(im => ({ variant_id: vrow.id, product_name: vrow.pname, variant_label: vrow.label, direction: 'in', reason: fm.reason, qty: 1, imei: im, note: fm.note || null, created_by: user?.username || '-' })))
+          if (toInsert.length) {
+            const { error } = await supabase.from('product_imeis').insert(toInsert.map(im => ({ variant_id: vrow.id, imei: im, status: 'available' })))
+            if (error) throw error
+          }
+          if (toRevive.length) {
+            const { error } = await supabase.from('product_imeis').update({ status: 'available' }).in('imei', toRevive)
+            if (error) throw error
+          }
+          // FIX: error insert mutasi sekarang dicek — tidak gagal diam-diam lagi
+          const { error: eMove } = await supabase.from('stock_movements').insert(list.map(im => ({ variant_id: vrow.id, product_name: vrow.pname, variant_label: vrow.label, direction: 'in', reason: fm.reason, qty: 1, imei: im, note: fm.note || null, created_by: user?.username || '-' })))
+          if (eMove) throw new Error('Gagal catat mutasi: ' + eMove.message + ' (cek tabel stock_movements)')
           toast.success(toRevive.length ? `${list.length} IMEI masuk (${toRevive.length} diaktifkan ulang)` : `${list.length} IMEI masuk`)
         } else {
           const notAvail = list.filter(im => !availImeis.includes(im))
           if (notAvail.length) return toast.error('IMEI tidak tersedia: ' + notAvail.join(', '))
           const st = IMEI_OUT_STATUS[fm.reason] || 'keluar'
-          await supabase.from('product_imeis').update({ status: st }).in('imei', list)
-          await supabase.from('stock_movements').insert(list.map(im => ({ variant_id: vrow.id, product_name: vrow.pname, variant_label: vrow.label, direction: 'out', reason: fm.reason, qty: 1, imei: im, note: fm.note || null, created_by: user?.username || '-' })))
+          const { error } = await supabase.from('product_imeis').update({ status: st }).in('imei', list)
+          if (error) throw error
+          const { error: eMove } = await supabase.from('stock_movements').insert(list.map(im => ({ variant_id: vrow.id, product_name: vrow.pname, variant_label: vrow.label, direction: 'out', reason: fm.reason, qty: 1, imei: im, note: fm.note || null, created_by: user?.username || '-' })))
+          if (eMove) throw new Error('Gagal catat mutasi: ' + eMove.message + ' (cek tabel stock_movements)')
           toast.success(`${list.length} unit keluar (${reasonLabel('out', fm.reason)})`)
         }
       } else {
@@ -103,7 +113,7 @@ export default function StokKartu() {
         const { error } = await supabase.from('product_variants').update({ stock_qty: next }).eq('id', vrow.id)
         if (error) throw error
         const { error: e2 } = await supabase.from('stock_movements').insert({ variant_id: vrow.id, product_name: vrow.pname, variant_label: vrow.label, direction: fm.direction, reason: fm.reason, qty, note: fm.note || null, created_by: user?.username || '-' })
-        if (e2) throw e2
+        if (e2) throw new Error('Stok terupdate tapi gagal catat mutasi: ' + e2.message + ' (cek tabel stock_movements)')
         toast.success(fm.direction === 'in' ? 'Stok masuk tercatat' : 'Stok keluar tercatat')
       }
       setShowForm(false); setFm({ variant_id: '', direction: 'in', reason: 'pembelian', qty: 1, imeis: '', note: '' }); setAvailImeis([]); setExistImeis([])
@@ -128,7 +138,8 @@ export default function StokKartu() {
             else toast.info('IMEI sudah terjual — baris IMEI tidak dihapus, hanya mutasinya')
           }
         }
-        await supabase.from('stock_movements').delete().eq('id', mv.id)
+        const { error } = await supabase.from('stock_movements').delete().eq('id', mv.id)
+        if (error) throw error
         toast.success('Mutasi dihapus & stok disesuaikan'); load()
       } catch (err) { toast.error('Gagal: ' + err.message) }
     })
