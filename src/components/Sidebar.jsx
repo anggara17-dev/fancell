@@ -1,3 +1,4 @@
+import { LayoutDashboard, ShoppingCart, Package, PackagePlus, History, FileText, Wallet, Settings, ShieldCheck, Repeat, ChevronDown, LogOut, Zap, CreditCard, Printer, Menu } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useStoreSettings } from '../lib/useStoreSettings'
@@ -11,6 +12,7 @@ export default function Sidebar({ currentPage, setCurrentPage }) {
     { id:'dashboard', label:'Dashboard', icon:LayoutDashboard, roles:['owner','kasir'] },
     { id:'kasir-group', label:'Kasir / POS', icon:ShoppingCart, roles:['owner','kasir'], children:[ {id:'kasir',label:'POS Kasir',icon:ShoppingCart}, {id:'metode-bayar',label:'Metode Bayar',icon:CreditCard}, {id:'cetak',label:'Cetak / Printer',icon:Printer} ] },
     { id:'barang', label:'Master Barang', icon:Package, roles:['owner','kasir','gudang'] },
+        { id:'stok', label:'Stok Masuk/Keluar', icon:PackagePlus, roles:['owner','kasir','gudang'] },
     { id:'riwayat', label:'Riwayat Transaksi', icon:History, roles:['owner','kasir'] },
     { id:'konsinyasi', label:'Konsinyasi', icon:Repeat, roles:['owner','kasir'] },
     { id:'garansi', label:'Garansi', icon:ShieldCheck, roles:['owner','kasir'] },
