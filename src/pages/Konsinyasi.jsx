@@ -46,7 +46,7 @@ export default function Konsinyasi() {
     const [p, m, s] = await Promise.all([
       supabase.from('consignment_partners').select('*').order('name'),
       supabase.from('consignment_moves').select('*').order('move_date', { ascending: false }),
-      supabase.from('consignment_settlements').select('*').order('settle_date', { ascending: false })
+      supabase.from('consignment_partner_payments').select('*').order('settle_date', { ascending: false })
     ])
     if (p.error) toast.error('Mitra: ' + p.error.message)
     if (m.error) toast.error('Mutasi: ' + m.error.message)
@@ -86,11 +86,15 @@ export default function Konsinyasi() {
       setShowPartner(false); setEditPartner(null); load()
     } catch (err) { toast.error(err.message) }
   }
-  function delPartner(id) {
+    function delPartner(id) {
     ask('Hapus mitra ini? Seluruh mutasi & pembayarannya ikut terhapus.', async () => {
-      const { error } = await supabase.from('consignment_partners').delete().eq('id', id)
-      if (error) toast.error(error.message)
-      else toast.success('Mitra dihapus')
+      try {
+        await supabase.from('consignment_moves').delete().eq('partner_id', id)
+        await supabase.from('consignment_partner_payments').delete().eq('partner_id', id)
+        const { error } = await supabase.from('consignment_partners').delete().eq('id', id)
+        if (error) throw error
+        toast.success('Mitra dihapus')
+      } catch (err) { toast.error(err.message) }
       load()
     })
   }
@@ -154,12 +158,13 @@ export default function Konsinyasi() {
     const payload = { partner_id: fs.partner_id, direction: fs.direction, amount: +fs.amount, note: fs.note, settle_date: fs.settle_date }
     try {
       if (editSettle) {
-        const { error } = await supabase.from('consignment_settlements').update(payload).eq('id', editSettle.id)
+        const { error } = await supabase.from('consignment_partner_payments').update(payload).eq('id', editSettle.id)
+
         if (error) throw error
         toast.success('Pembayaran diupdate')
       } else {
-        const { error } = await supabase.from('consignment_settlements').insert(payload)
-        if (error) throw error
+const { error } = await supabase.from('consignment_partner_payments').insert(payload)
+  if (error) throw error
         toast.success(fs.direction === 'in' ? 'Pembayaran ke mitra tercatat (hutang -)' : 'Penerimaan dari mitra tercatat (piutang -)')
       }
       setShowSettle(false); setEditSettle(null); load()
@@ -167,7 +172,7 @@ export default function Konsinyasi() {
   }
   function delSettle(id) {
     ask('Hapus catatan pembayaran ini?', async () => {
-      const { error } = await supabase.from('consignment_settlements').delete().eq('id', id)
+      const { error } = await supabase.from('consignment_partner_payments').delete().eq('id', id)
       if (error) toast.error(error.message)
       else toast.success('Pembayaran dihapus')
       load()
@@ -205,7 +210,7 @@ export default function Konsinyasi() {
         <div className="flex gap-2 mb-4 flex-wrap">
           <input value={fp.name} onChange={e => setFp({ ...fp, name: e.target.value })} placeholder="Nama Mitra / Supplier" className="flex-1 min-w-[180px] px-4 py-2.5 border rounded-full outline-none focus:ring-2 focus:ring-[#0058A3] text-sm" />
           <input value={fp.phone} onChange={e => setFp({ ...fp, phone: e.target.value })} placeholder="No. WhatsApp" className="flex-1 min-w-[160px] px-4 py-2.5 border rounded-full outline-none focus:ring-2 focus:ring-[#0058A3] text-sm" />
-          <button onClick={savePartner} className="px-4 py-2.5 bg-gray-900 text-white rounded-full text-sm font-medium hover:bg-black flex items-center gap-1"><Plus className="w-4 h-4" />Tambah Mitra</button>
+          <button onClick={savePartner} className="px-4 py-2.5 bg-[#0058A3] text-white rounded-full text-sm font-medium hover:bg-[#004080] flex items-center gap-1"><Plus className="w-4 h-4" />Tambah Mitra</button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
