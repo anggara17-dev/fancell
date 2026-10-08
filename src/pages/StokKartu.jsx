@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import PageHeader from '../components/PageHeader'
-import { Confirm, Modal, RupiahInput, useToast } from '../components/ui'
+import { Confirm, Modal, RupiahInput, useToast, rp } from '../components/ui'
 import { PackagePlus, ArrowDownToLine, ArrowUpFromLine, Plus, Trash2, Calendar, Search } from 'lucide-react'
 import { format, startOfMonth } from 'date-fns'
 
@@ -66,7 +66,7 @@ export default function StokKartu() {
     setAvailImeis([]); setExistImeis([])
     if (!id) return
     const vrow = variants.find(v => v.id === id)
-    if (vrow) setFm(f => ({ ...f, unit_value: +vrow.hpp || 0 })) // default harga titipan = HPP varian
+    if (vrow) setFm(f => ({ ...f, unit_value: +vrow.hpp || 0 }))
     if (vrow?.stock_type === 'imei') {
       const { data } = await supabase.from('product_imeis').select('imei,status').eq('variant_id', id)
       setExistImeis((data || []).map(x => x.imei))
