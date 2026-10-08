@@ -12,15 +12,14 @@ export default function KeuntunganModal() {
   const [cf, setCf] = useState(null); const ask = (message, action) => setCf({ message, action })
   useEffect(() => { run() }, [])
   async function run() {
-    const [cap, tx, cons] = await Promise.all([
+    const [cap, tx] = await Promise.all([
       supabase.from('capital_transactions').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }),
-      supabase.from('transactions').select('total_amount, transaction_items(hpp_at_sale,qty), payments(admin_fee)').eq('payment_status', 'paid'),
-      supabase.from('consignment_settlements').select('owner_share').not('owner_share', 'is', null)
+      supabase.from('transactions').select('total_amount, transaction_items(hpp_at_sale,qty), payments(admin_fee)').eq('payment_status', 'paid')
     ])
     let modal = 0, prive = 0; (cap.data || []).forEach(c => { if (c.type === 'capital_in') modal += +c.amount || 0; else prive += +c.amount || 0 })
     let rev = 0, hpp = 0, fee = 0; (tx.data || []).forEach(t => { rev += +t.total_amount || 0; (t.transaction_items || []).forEach(i => hpp += (+i.hpp_at_sale || 0) * (i.qty || 1)); (t.payments || []).forEach(p => fee += +p.admin_fee || 0) })
-    const ownerShare = (cons.data || []).reduce((a, c) => a + (+c.owner_share || 0), 0)
-    const keuntungan = rev - hpp - fee - ownerShare
+    // HPP barang konsinyasi sudah mencakup harga titipan ke mitra — laba otomatis benar
+    const keuntungan = rev - hpp - fee
     setData({ modal, keuntungan, prive, saldo: modal + keuntungan - prive })
     setRows(cap.data || []); setLoad(false)
   }
@@ -62,7 +61,7 @@ export default function KeuntunganModal() {
           </tr>))}</tbody>
         </table></div>}
       </div>
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4"><h4 className="text-sm font-semibold text-[#0058A3] mb-2">Cara Kerja</h4><ul className="text-sm text-gray-700 space-y-1"><li>• <strong>Modal</strong>: setoran owner/investor</li><li>• <strong>Keuntungan</strong>: laba bersih otomatis (pendapatan - HPP - biaya admin - bagi hasil owner titipan)</li><li>• <strong>Prive</strong>: pengambilan owner untuk pribadi — bisa diedit/dihapus lewat tabel Riwayat</li><li>• <strong>Saldo</strong> = Modal + Keuntungan - Prive</li></ul></div>
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4"><h4 className="text-sm font-semibold text-[#0058A3] mb-2">Cara Kerja</h4><ul className="text-sm text-gray-700 space-y-1"><li>• <strong>Modal</strong>: setoran owner/investor</li><li>• <strong>Keuntungan</strong>: laba bersih otomatis (pendapatan - HPP - biaya admin). HPP barang titipan sudah termasuk harga titipan ke mitra</li><li>• <strong>Prive</strong>: pengambilan owner untuk pribadi — bisa diedit/dihapus lewat tabel Riwayat</li><li>• <strong>Hutang konsinyasi</strong>: dikelola di halaman Konsinyasi (terbentuk otomatis saat barang titipan masuk lewat Stok Masuk/Keluar)</li><li>• <strong>Saldo</strong> = Modal + Keuntungan - Prive</li></ul></div>
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editing ? 'Edit Catatan Modal/Prive' : 'Catat Modal / Prive'} footer={<button form="capForm" type="submit" className="w-full py-2.5 bg-[#0058A3] text-white rounded-lg font-medium flex items-center justify-center gap-2"><Check className="w-4 h-4"/>Simpan</button>}>
         <form id="capForm" onSubmit={submit} className="space-y-4">
           <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Jenis</label><select value={fd.type} onChange={e => setFd({ ...fd, type: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg bg-white"><option value="capital_in">Setoran Modal (+)</option><option value="prive_out">Peng Prive (-)</option></select></div>
