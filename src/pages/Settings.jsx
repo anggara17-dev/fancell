@@ -3,10 +3,10 @@ import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { invalidateSettings } from '../lib/useStoreSettings'
 import { Confirm, Modal, useToast } from '../components/ui'
-import { Plus, Edit2, Trash2, Check, Store, Users, Upload, ImageIcon, RotateCcw } from 'lucide-react'
-const emptyUser = { username:'', email:'', password:'', role:'kasir' }
+import { Plus, Edit2, Trash2, Check, Store, Users, Upload, ImageIcon, RotateCcw, Eye, EyeOff } from 'lucide-react'
+const emptyUser = { username:'', email:'', password:'', password2:'' }
 
-// FIX: dipindah ke luar komponen — kalau di dalam, input di-remount tiap ketikan & fokus hilang
+// FIX: komponen di luar — input tidak di-remount tiap ketikan
 function Field({ label, children }) {
   return <div><label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>{children}</div>
 }
@@ -35,7 +35,6 @@ function TabToko() {
   const [loading, setLoading] = useState(true)
   const [logoSide, setLogoSide] = useState(null); const [logoStruk, setLogoStruk] = useState(null); const [saving, setSaving] = useState(false)
   const [prevSide, setPrevSide] = useState(null); const [prevStruk, setPrevStruk] = useState(null)
-  // FIX: penanda "user sudah mulai mengetik" — respons fetch telat tidak boleh menimpa ketikan
   const dirtyRef = useRef(false)
   useEffect(() => {
     let alive = true
@@ -82,10 +81,34 @@ function TabToko() {
 function TabUser() {
   const toast = useToast(); const { user: me } = useAuth()
   const [users, setUsers] = useState([]); const [load, setLoad] = useState(true); const [showForm, setShowForm] = useState(false); const [editing, setEditing] = useState(null); const [fd, setFd] = useState(emptyUser)
+  const [showPw, setShowPw] = useState(false)
   const [cf, setCf] = useState(null); const ask = (message, action, confirmText) => setCf({ message, action, confirmText })
   useEffect(() => { run() }, [])
   async function run() { const { data, error } = await supabase.from('users').select('id, username, email, role, is_active').order('username'); if (error) toast.error(error.message); setUsers(data || []); setLoad(false) }
-  async function submit(e) { e.preventDefault(); try { if (editing) { const upd = { username: fd.username, email: fd.email || null, role: fd.role }; if (fd.password) upd.password = fd.password; const { error } = await supabase.from('users').update(upd).eq('id', editing.id); if (error) throw error; toast.success('User diupdate') } else { if (!fd.password) return toast.error('Password wajib diisi'); const { error } = await supabase.from('users').insert({ username: fd.username, email: fd.email || null, password: fd.password, role: fd.role, is_active: true }); if (error) throw error; toast.success('User ditambahkan') } setShowForm(false); setEditing(null); setFd(emptyUser); run() } catch (err) { toast.error(err.message) } }
+  async function submit(e) {
+    e.preventDefault()
+    try {
+      if (editing) {
+        const upd = { username: fd.username, email: fd.email || null, role: fd.role }
+        if (fd.password) {
+          if (fd.password !== fd.password2) return toast.error('Konfirmasi password tidak sama — ketik ulang dengan sama persis')
+          upd.password = fd.password
+        }
+        // .select() untuk memastikan update benar-benar mengenai baris
+        const { data: saved, error } = await supabase.from('users').update(upd).eq('id', editing.id).select()
+        if (error) throw error
+        if (!saved || !saved.length) return toast.error('Update tidak tersimpan — cek koneksi / izin database')
+        toast.success(fd.password ? 'User diupdate — password baru tersimpan ✓' : 'User diupdate')
+      } else {
+        if (!fd.password) return toast.error('Password wajib diisi')
+        if (fd.password !== fd.password2) return toast.error('Konfirmasi password tidak sama — ketik ulang dengan sama persis')
+        const { error } = await supabase.from('users').insert({ username: fd.username, email: fd.email || null, password: fd.password, role: fd.role, is_active: true })
+        if (error) throw error
+        toast.success('User ditambahkan — password tersimpan ✓')
+      }
+      setShowForm(false); setEditing(null); setFd(emptyUser); setShowPw(false); run()
+    } catch (err) { toast.error(err.message) }
+  }
   function toggleUser(u) {
     if (u.id === me?.id) return toast.error('Tidak bisa menonaktifkan akun sendiri')
     if (u.is_active === false) {
@@ -94,9 +117,17 @@ function TabUser() {
       ask(`Nonaktifkan user "${u.username}"? User tidak akan bisa login lagi.`, async () => { const { error } = await supabase.from('users').update({ is_active: false }).eq('id', u.id); if (error) toast.error(error.message); else toast.success('User dinonaktifkan'); run() }, 'Ya, Nonaktifkan')
     }
   }
-  function edit(u) { setEditing(u); setFd({ username: u.username, email: u.email || '', password: '', role: u.role }); setShowForm(true) }
-  function add() { setEditing(null); setFd(emptyUser); setShowForm(true) }
+  function edit(u) { setEditing(u); setFd({ username: u.username, email: u.email || '', password: '', password2: '' }); setShowPw(false); setShowForm(true) }
+  function add() { setEditing(null); setFd(emptyUser); setShowPw(false); setShowForm(true) }
   const badge = r => { const c = { owner: 'bg-[#0058A3] text-white', kasir: 'bg-blue-100 text-[#0058A3]', gudang: 'bg-gray-100 text-gray-700' }; return <span className={`px-2.5 py-1 rounded-md text-xs font-medium ${c[r] || c.kasir}`}>{r.toUpperCase()}</span> }
+  const pwInput = (field, placeholder) => (
+    <div className="relative">
+      <input type={showPw ? 'text' : 'password'} required={field === 'password' ? (!editing || !!fd.password) : (!!fd.password)} value={fd[field]} onChange={e => setFd({ ...fd, [field]: e.target.value })} className="w-full px-4 py-2.5 pr-11 border rounded-lg outline-none focus:ring-2 focus:ring-[#0058A3]" placeholder={placeholder} autoComplete="new-password"/>
+      <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#0058A3] p-1" title={showPw ? 'Sembunyikan password' : 'Lihat password'}>
+        {showPw ? <EyeOff className="w-5 h-5"/> : <Eye className="w-5 h-5"/>}
+      </button>
+    </div>
+  )
   if (load) return <div className="p-8 flex justify-center"><div className="w-8 h-8 border-4 border-[#0058A3] border-t-transparent rounded-full animate-spin"/></div>
   return (
     <div>
@@ -105,12 +136,17 @@ function TabUser() {
         <form id="userForm" onSubmit={submit} className="space-y-4">
           <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Username *</label><input type="text" required value={fd.username} onChange={e => setFd({ ...fd, username: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg outline-none"/></div>
           <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Email (Opsional)</label><input type="email" value={fd.email} onChange={e => setFd({ ...fd, email: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg outline-none"/></div>
-          <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Password {editing ? '(kosongkan jika tidak diubah)' : '*'}</label><input type="password" required={!editing} value={fd.password} onChange={e => setFd({ ...fd, password: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg outline-none" minLength={6}/></div>
-          <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Role *</label><select value={fd.role} onChange={e => setFd({ ...fd, role: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg bg-white"><option value="owner">Owner (Akses Penuh)</option><option value="kasir">Kasir (Transaksi & Stok)</option><option value="gudang">Gudang (Master Barang Saja)</option></select><p className="text-xs text-gray-500 mt-1">{fd.role === 'owner' ? 'Semua modul termasuk Laba Rugi, Garansi & Pengaturan' : fd.role === 'kasir' ? 'POS, Riwayat, Barang, Garansi (tanpa Laba Rugi/Modal/Pengaturan)' : 'Master Barang saja'}</p></div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Password {editing ? '(isi hanya jika mau ganti)' : '*'}</label>
+            {pwInput('password', editing ? 'Kosongkan bila tidak diganti' : 'Minimal 6 karakter')}
+            {fd.password && <div className="mt-2"><label className="block text-sm font-medium text-gray-700 mb-1.5">Ulangi Password (konfirmasi) *</label>{pwInput('password2', 'Ketik ulang password yang sama')}</div>}
+            <p className="text-[11px] text-gray-400 mt-1">Klik ikon 👁 untuk melihat password sebelum simpan — pastikan ketik 2x sama.</p>
+          </div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Role *</label><select value={fd.role} onChange={e => setFd({ ...fd, role: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg bg-white"><option value="owner">Owner (Akses Penuh)</option><option value="kasir">Kasir (Transaksi & Stok)</option><option value="gudang">Gudang (Master Barang Saja)</option></select><p className="text-xs text-gray-500 mt-1">{fd.role === 'owner' ? 'Semua modul termasuk Laba Rugi, Garansi & Pengaturan' : fd.role === 'kasir' ? 'POS, Riwayat, Barang, Garansi (tanpa Laba Rugi/Modal/Pengaturan)' : 'Master Barang & Stok saja'}</p></div>
         </form>
       </Modal>
       <div className="bg-white rounded-xl border shadow-sm overflow-hidden"><div className="overflow-x-auto"><table className="w-full"><thead><tr className="bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase"><th className="text-left p-3">User</th><th className="text-left p-3">Email</th><th className="text-left p-3">Role</th><th className="text-left p-3">Hak Akses</th><th className="text-right p-3">Aksi</th></tr></thead>
-        <tbody className="divide-y">{users.map(u => (<tr key={u.id} className="hover:bg-gray-50"><td className="p-3"><div className="flex items-center gap-3"><div className="w-9 h-9 bg-gradient-to-br from-[#0058A3] to-[#004080] rounded-full flex items-center justify-center font-bold text-white text-sm">{u.username?.charAt(0).toUpperCase()}</div><span className="text-sm font-medium">{u.username}</span>{u.is_active === false && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-600 font-medium">nonaktif</span>}</div></td><td className="p-3 text-sm text-gray-600">{u.email || '-'}</td><td className="p-3">{badge(u.role)}</td><td className="p-3 text-xs text-gray-500">{u.role === 'owner' ? 'Semua modul' : u.role === 'kasir' ? 'POS, Riwayat, Barang, Garansi' : 'Master Barang saja'}</td><td className="p-3 text-right"><div className="flex justify-end gap-2"><button onClick={() => edit(u)} className="p-1.5 hover:bg-blue-50 rounded text-[#0058A3]"><Edit2 className="w-4 h-4"/></button><button onClick={() => toggleUser(u)} className="p-1.5 hover:bg-red-50 rounded text-red-600" title={u.is_active === false ? 'Aktifkan kembali' : 'Nonaktifkan'}>{u.is_active === false ? <RotateCcw className="w-4 h-4"/> : <Trash2 className="w-4 h-4"/>}</button></div></td></tr>))}</tbody></table></div></div>
+        <tbody className="divide-y">{users.map(u => (<tr key={u.id} className="hover:bg-gray-50"><td className="p-3"><div className="flex items-center gap-3"><div className="w-9 h-9 bg-gradient-to-br from-[#0058A3] to-[#004080] rounded-full flex items-center justify-center font-bold text-white text-sm">{u.username?.charAt(0).toUpperCase()}</div><span className="text-sm font-medium">{u.username}</span>{u.is_active === false && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-600 font-medium">nonaktif</span>}{u.id === me?.id && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-[#0058A3] font-medium">kamu</span>}</div></td><td className="p-3 text-sm text-gray-600">{u.email || '-'}</td><td className="p-3">{badge(u.role)}</td><td className="p-3 text-xs text-gray-500">{u.role === 'owner' ? 'Semua modul' : u.role === 'kasir' ? 'POS, Riwayat, Barang, Garansi' : 'Master Barang & Stok'}</td><td className="p-3 text-right"><div className="flex justify-end gap-2"><button onClick={() => edit(u)} className="p-1.5 hover:bg-blue-50 rounded text-[#0058A3]"><Edit2 className="w-4 h-4"/></button><button onClick={() => toggleUser(u)} className="p-1.5 hover:bg-red-50 rounded text-red-600" title={u.is_active === false ? 'Aktifkan kembali' : 'Nonaktifkan'}>{u.is_active === false ? <RotateCcw className="w-4 h-4"/> : <Trash2 className="w-4 h-4"/>}</button></div></td></tr>))}</tbody></table></div></div>
       <Confirm open={!!cf} danger message={cf?.message} confirmText={cf?.confirmText || 'Ya, Lanjut'} onClose={() => setCf(null)} onConfirm={async () => { const a = cf.action; setCf(null); await a() }}/>
     </div>
   )
