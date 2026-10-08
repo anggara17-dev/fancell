@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from 'react'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
@@ -16,6 +17,7 @@ export default function POSKasir() {
   const [showPay, setShowPay] = useState(false); const [custName, setCustName] = useState(''); const [custPhone, setCustPhone] = useState('')
   const [pays, setPays] = useState([]); const [processing, setProcessing] = useState(false); const [done, setDone] = useState(null)
   const [modalVar, setModalVar] = useState(null); const [modalImei, setModalImei] = useState(null)
+    const scanRef = useRef(null)
   useEffect(() => { boot() }, [])
   useEffect(() => { const h = e => { if (e.key === 'Escape') { if (modalImei) setModalImei(null); else if (modalVar) setModalVar(null); else if (showPay) setShowPay(false); else if (done) setDone(null) } }; window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h) }, [modalImei, modalVar, showPay, done])
   async function boot() {
@@ -30,6 +32,26 @@ export default function POSKasir() {
   const filtered = products.filter(x => { const okCat = cat === 'all' || x.category === cat; const s = q.toLowerCase(); const okQ = !s || x.name?.toLowerCase().includes(s) || x.brand?.toLowerCase().includes(s) || x.category?.toLowerCase().includes(s); return okCat && okQ })
   function addAcc(prod, varr) { setCart(c => [...c, { key: Date.now() + Math.random(), isImei: false, variantId: varr.id, productName: `${prod.name} · ${vlabel(varr)}`, variantLabel: vlabel(varr), imei: null, harga_jual: +varr.harga_jual || 0, hpp: +varr.hpp || 0, qty: 1, baseStock: varr.stok, image: prod.image_url, consignment: prod.type === 'consignment', ownerId: prod.consignment_owner_id, split: prod.consignment_split }]) }
   function addImei(prod, varr, imei) { setCart(c => [...c, { key: Date.now() + Math.random(), isImei: true, variantId: varr.id, productName: `${prod.name} · ${vlabel(varr)}`, variantLabel: vlabel(varr), imei, harga_jual: +varr.harga_jual || 0, hpp: +varr.hpp || 0, qty: 1, baseStock: 0, image: prod.image_url, consignment: prod.type === 'consignment', ownerId: prod.consignment_owner_id, split: prod.consignment_split }]); setModalImei(null); setModalVar(null) }
+    function handleScanKey(e) {
+    if (e.key !== 'Enter' && e.key !== 'Tab') return
+    const code = q.trim()
+    if (!code) return
+    e.preventDefault()
+    const all = []
+    products.forEach(p => p.variants.forEach(v => (v.imeis || []).forEach(im => all.push({ prod: p, varr: v, imei: im }))))
+    const lc = code.toLowerCase()
+    let hit = all.find(x => x.imei.toLowerCase() === lc)
+    if (!hit) {
+      const fuzzy = all.filter(x => x.imei.toLowerCase().includes(lc))
+      if (fuzzy.length === 1) hit = fuzzy[0]
+      else if (fuzzy.length > 1) { toast.error('Beberapa IMEI cocok — scan ulang lebih lengkap'); return }
+    }
+    if (!hit) { toast.error('IMEI "' + code + '" tidak ditemukan / unit sudah terjual'); return }
+    addImei(hit.prod, hit.varr, hit.imei)
+    setQ('')
+    toast.success('✓ ' + hit.prod.name + ' masuk keranjang (scan)')
+    if (scanRef.current) scanRef.current.focus()
+  }
   function clickCard(prod) { if (!prod.avail) return; if (prod.stock_type === 'imei') { setModalVar(prod); return } if (prod.variants.length === 1) addAcc(prod, prod.variants[0]); else setModalVar(prod) }
   function clickVariant(prod, varr) { if (varr.stok <= 0) return; if (prod.stock_type === 'imei') { if (varr.imeis.length === 1) addImei(prod, varr, varr.imeis[0]); else setModalImei({ prod, varr }) } else { addAcc(prod, varr); setModalVar(null) } }
   function chQty(id, d) { setCart(c => c.map(i => { if (i.key !== id || i.isImei) return i; const nq = i.qty + d; return nq > 0 ? { ...i, qty: nq } : i }).filter(i => i.qty > 0)) }
@@ -81,7 +103,7 @@ export default function POSKasir() {
     <div className="flex h-[calc(100vh-73px)]">
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="p-4 bg-white border-b border-gray-200">
-          <div className="relative mb-3"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"/><input value={q} onChange={e => setQ(e.target.value)} placeholder="Cari produk / Scan IMEI (Enter)..." className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0058A3] outline-none"/></div>
+          <div className="relative mb-3"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"/><input ref={scanRef} autoFocus value={q} onChange={e => setQ(e.target.value)} onKeyDown={handleScanKey} placeholder="Cari produk / scan IMEI di sini..." className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0058A3] outline-none"/></div>
           <div className="flex gap-2 overflow-x-auto"><button onClick={() => setCat('all')} className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap ${cat === 'all' ? 'bg-[#0058A3] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>Semua</button>{cats.map(c => (<button key={c} onClick={() => setCat(c)} className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap ${cat === c ? 'bg-[#0058A3] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{c}</button>))}</div>
         </div>
         <div className="flex-1 overflow-y-auto p-4">
