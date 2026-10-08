@@ -16,7 +16,7 @@ export default function POSKasir() {
   const [showPay, setShowPay] = useState(false); const [custName, setCustName] = useState(''); const [custPhone, setCustPhone] = useState('')
   const [pays, setPays] = useState([]); const [processing, setProcessing] = useState(false); const [done, setDone] = useState(null)
   const [modalVar, setModalVar] = useState(null); const [modalImei, setModalImei] = useState(null)
-    const scanRef = useRef(null)
+  const scanRef = useRef(null)
   useEffect(() => { boot() }, [])
   useEffect(() => { const h = e => { if (e.key === 'Escape') { if (modalImei) setModalImei(null); else if (modalVar) setModalVar(null); else if (showPay) setShowPay(false); else if (done) setDone(null) } }; window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h) }, [modalImei, modalVar, showPay, done])
   async function boot() {
@@ -29,9 +29,9 @@ export default function POSKasir() {
   }
   const cats = [...new Set(products.map(p => p.category))]
   const filtered = products.filter(x => { const okCat = cat === 'all' || x.category === cat; const s = q.toLowerCase(); const okQ = !s || x.name?.toLowerCase().includes(s) || x.brand?.toLowerCase().includes(s) || x.category?.toLowerCase().includes(s); return okCat && okQ })
-  function addAcc(prod, varr) { setCart(c => [...c, { key: Date.now() + Math.random(), isImei: false, variantId: varr.id, productName: `${prod.name} · ${vlabel(varr)}`, variantLabel: vlabel(varr), imei: null, harga_jual: +varr.harga_jual || 0, hpp: +varr.hpp || 0, qty: 1, baseStock: varr.stok, image: prod.image_url, consignment: prod.type === 'consignment', ownerId: prod.consignment_owner_id, split: prod.consignment_split }]) }
-  function addImei(prod, varr, imei) { setCart(c => [...c, { key: Date.now() + Math.random(), isImei: true, variantId: varr.id, productName: `${prod.name} · ${vlabel(varr)}`, variantLabel: vlabel(varr), imei, harga_jual: +varr.harga_jual || 0, hpp: +varr.hpp || 0, qty: 1, baseStock: 0, image: prod.image_url, consignment: prod.type === 'consignment', ownerId: prod.consignment_owner_id, split: prod.consignment_split }]); setModalImei(null); setModalVar(null) }
-    function handleScanKey(e) {
+  function addAcc(prod, varr) { setCart(c => [...c, { key: Date.now() + Math.random(), isImei: false, variantId: varr.id, productName: `${prod.name} · ${vlabel(varr)}`, variantLabel: vlabel(varr), imei: null, harga_jual: +varr.harga_jual || 0, hpp: +varr.hpp || 0, qty: 1, baseStock: varr.stok, image: prod.image_url, consignment: prod.type === 'consignment' }]) }
+  function addImei(prod, varr, imei) { setCart(c => [...c, { key: Date.now() + Math.random(), isImei: true, variantId: varr.id, productName: `${prod.name} · ${vlabel(varr)}`, variantLabel: vlabel(varr), imei, harga_jual: +varr.harga_jual || 0, hpp: +varr.hpp || 0, qty: 1, baseStock: 0, image: prod.image_url, consignment: prod.type === 'consignment' }]); setModalImei(null); setModalVar(null) }
+  function handleScanKey(e) {
     if (e.key !== 'Enter' && e.key !== 'Tab') return
     const code = q.trim()
     if (!code) return
@@ -75,8 +75,8 @@ export default function POSKasir() {
       const inv = 'INV' + new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14) + Math.random().toString(36).slice(2, 6).toUpperCase()
       const { data: tx, error: e1 } = await supabase.from('transactions').insert({ cashier_id: user?.id || null, cashier_name: user?.username || 'Kasir', customer_name: custName || 'Umum', customer_phone: custPhone || null, subtotal, discount_type: discType, discount_value: Number(discVal) || 0, discount_amount: discAmt, trade_in_value: ttVal, warranty_type: warranty, warranty_months: wM, total_amount: tagihan, amount_paid: paid, payment_status: 'paid', transaction_type: 'sale', invoice_no: inv }).select().single()
       if (e1) throw e1
-      const items = cart.map(i => ({ transaction_id: tx.id, product_id: i.variantId, product_name: i.productName, variant_label: i.variantLabel, imei: i.imei, qty: i.qty, price_at_sale: i.harga_jual, hpp_at_sale: i.hpp, line_total: i.harga_jual * i.qty, line_profit: (i.harga_jual - i.hpp) * i.qty, is_consignment: !!i.consignment, owner_id: null, split_percent: null
-      const { data: insItems, error: e2 } = await supabase.from('transaction_items').insert(items).select(); if (e2) throw e2
+      const items = cart.map(i => ({ transaction_id: tx.id, product_id: i.variantId, product_name: i.productName, variant_label: i.variantLabel, imei: i.imei, qty: i.qty, price_at_sale: i.harga_jual, hpp_at_sale: i.hpp, line_total: i.harga_jual * i.qty, line_profit: (i.harga_jual - i.hpp) * i.qty, is_consignment: !!i.consignment, owner_id: null, split_percent: null }))
+      const { error: e2 } = await supabase.from('transaction_items').insert(items); if (e2) throw e2
       let fee = 0; const payRows = pays.map(r => { const m = methods.find(x => x.id === r.method_id); const f = (Number(r.amount) || 0) * ((m?.admin_fee_percentage) || 0) / 100 + (m?.admin_fee_fixed || 0); fee += f; return { transaction_id: tx.id, payment_method_id: r.method_id, method_name: r.method_name, amount: Number(r.amount) || 0, admin_fee: f, reference_number: inv, extra_value: r.extra || null } })
       const { error: e3 } = await supabase.from('payments').insert(payRows); if (e3) throw e3
       await supabase.from('transactions').update({ total_admin_fee: fee }).eq('id', tx.id)
@@ -129,7 +129,7 @@ export default function POSKasir() {
             <div className="flex-1 min-w-0">
               <div className="flex justify-between items-start gap-1"><p className="text-sm font-medium truncate">{i.productName}</p><button onClick={() => rm(i.key)} className="text-red-500 hover:bg-red-50 rounded p-0.5 flex-shrink-0"><Trash2 className="w-4 h-4"/></button></div>
               {i.imei && <p className="text-[10px] font-mono text-gray-400 truncate">{i.imei}</p>}
-              {i.consignment && <p className="text-[10px] text-amber-600 font-medium">Barang Titipan (Konsinyasi){i.split ? ` · bagi ${i.split}%` : ''}</p>}
+              {i.consignment && <p className="text-[10px] text-amber-600 font-medium">Barang Titipan (Konsinyasi)</p>}
               <div className="flex justify-between items-center mt-1"><div className="flex items-center gap-1.5"><button onClick={() => chQty(i.key, -1)} disabled={i.isImei} className="w-6 h-6 bg-white border rounded disabled:opacity-30 text-xs"><Minus className="w-3 h-3 mx-auto"/></button><span className="w-5 text-center text-sm font-semibold">{i.qty}</span><button onClick={() => chQty(i.key, 1)} disabled={i.isImei} className="w-6 h-6 bg-white border rounded disabled:opacity-30 text-xs"><Plus className="w-3 h-3 mx-auto"/></button></div><span className="text-sm font-bold text-[#0058A3]">{rp(i.harga_jual * i.qty)}</span></div>
             </div>
           </div>))}
@@ -161,7 +161,7 @@ export default function POSKasir() {
         <button onClick={checkout} disabled={!lunas || processing} className="w-full bg-[#0058A3] text-white py-3 rounded-lg font-semibold hover:bg-[#004080] disabled:opacity-40 flex items-center justify-center gap-2">{processing ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/>Memproses...</> : <><Check className="w-5 h-5"/>Selesaikan Pembayaran</>}</button>
       </div></div></div>}
       {done && <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in"><div className="bg-white rounded-xl shadow-2xl w-full max-w-sm max-h-[92vh] overflow-y-auto">
-        <div className="p-5 text-center border-b"><div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2"><Check className="w-7 h-7 text-green-600"/></div><h3 className="text-lg font-bold">Transaksi Berhasil</h3><p className="text-xs text-gray-500">Stok, laporan & bagi hasil konsinyasi terupdate</p></div>
+        <div className="p-5 text-center border-b"><div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2"><Check className="w-7 h-7 text-green-600"/></div><h3 className="text-lg font-bold">Transaksi Berhasil</h3><p className="text-xs text-gray-500">Stok & laporan terupdate otomatis</p></div>
         <div className="p-4"><div className="struk border border-dashed border-gray-300 rounded-lg p-3" dangerouslySetInnerHTML={{ __html: strukHTML(done) }}/></div>
         <div className="p-4 pt-0 flex gap-3"><button onClick={() => printStruk(done)} className="flex-1 bg-[#0058A3] text-white rounded-lg py-2.5 font-semibold flex items-center justify-center gap-2 hover:bg-[#004080] transition-colors"><Printer className="w-4 h-4"/>Print Struk</button><button onClick={() => setDone(null)} className="flex-1 border border-[#0058A3] text-[#0058A3] rounded-lg py-2.5 font-medium hover:bg-blue-50 transition-colors">Tutup [Esc]</button></div>
       </div></div>}
