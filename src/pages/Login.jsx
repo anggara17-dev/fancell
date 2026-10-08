@@ -90,7 +90,9 @@ export default function Login() {
                 {loading ? <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"/> : <><Lock className="w-4 h-4"/>Masuk</>}
               </button>
             </form>
-            <p className="text-center text-xs text-gray-400 mt-8">Fancell POS System v1.0</p>
+            <p className="text-center text-xs text-gray-400 mt-8">Design & Develop By Depgo
+
+</p>
           </div>
         </div>
       </div>
