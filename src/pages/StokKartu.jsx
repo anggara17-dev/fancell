@@ -2,27 +2,28 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import PageHeader from '../components/PageHeader'
-import { Confirm, Modal, useToast } from '../components/ui'
+import { Confirm, Modal, RupiahInput, useToast } from '../components/ui'
 import { PackagePlus, ArrowDownToLine, ArrowUpFromLine, Plus, Trash2, Calendar, Search } from 'lucide-react'
 import { format, startOfMonth } from 'date-fns'
 
 const today = () => format(new Date(), 'yyyy-MM-dd')
 const startMonth = () => { const d = new Date(); d.setDate(1); return format(d, 'yyyy-MM-dd') }
 const vlabel = v => [v.color, v.storage].filter(x => x && x !== '-').join(' - ') || 'Standar'
-const IMEI_OUT_STATUS = { rusak: 'rusak', hilang: 'hilang', retur_supplier: 'returned', dipakai_internal: 'dipakai', opname_minus: 'opname', penjualan: 'sold', lainnya: 'keluar' }
+const IMEI_OUT_STATUS = { rusak: 'rusak', hilang: 'hilang', retur_supplier: 'returned', dipakai_internal: 'dipakai', opname_minus: 'opname', penjualan: 'sold', lainnya: 'keluar', konsinyasi_retur: 'returned' }
 const REASONS = {
-  in: [['stok_awal', 'Stok Awal'], ['pembelian', 'Pembelian / Restock'], ['retur_customer', 'Retur dari Customer'], ['retur_penjualan', 'Pembatalan Transaksi (Void)'], ['opname_plus', 'Hasil Opname (Selisih Lebih)'], ['lainnya', 'Lainnya']],
-  out: [['penjualan', 'Penjualan (POS)'], ['rusak', 'Barang Rusak'], ['hilang', 'Barang Hilang'], ['dipakai_internal', 'Dipakai Internal'], ['retur_supplier', 'Retur ke Supplier'], ['opname_minus', 'Hasil Opname (Selisih Kurang)'], ['lainnya', 'Lainnya']]
+  in: [['stok_awal', 'Stok Awal'], ['pembelian', 'Pembelian / Restock'], ['konsinyasi', 'Barang Konsinyasi (Titipan Mitra)'], ['retur_customer', 'Retur dari Customer'], ['retur_penjualan', 'Pembatalan Transaksi (Void)'], ['opname_plus', 'Hasil Opname (Selisih Lebih)'], ['lainnya', 'Lainnya']],
+  out: [['penjualan', 'Penjualan (POS)'], ['konsinyasi_retur', 'Retur Konsinyasi ke Mitra'], ['rusak', 'Barang Rusak'], ['hilang', 'Barang Hilang'], ['dipakai_internal', 'Dipakai Internal'], ['retur_supplier', 'Retur ke Supplier'], ['opname_minus', 'Hasil Opname (Selisih Kurang)'], ['lainnya', 'Lainnya']]
 }
 const reasonLabel = (dir, r) => { const f = (REASONS[dir] || []).find(x => x[0] === r); return f ? f[1] : r }
+const isCons = r => r === 'konsinyasi' || r === 'konsinyasi_retur'
 
 export default function StokKartu() {
   const toast = useToast(); const { user } = useAuth()
-  const [variants, setVariants] = useState([]); const [moves, setMoves] = useState([]); const [loading, setLoading] = useState(true)
+  const [variants, setVariants] = useState([]); const [moves, setMoves] = useState([]); const [partners, setPartners] = useState([]); const [loading, setLoading] = useState(true)
   const [from, setFrom] = useState(startMonth()); const [to, setTo] = useState(today())
   const [dirFilter, setDirFilter] = useState('all'); const [q, setQ] = useState('')
   const [showForm, setShowForm] = useState(false)
-  const [fm, setFm] = useState({ variant_id: '', direction: 'in', reason: 'pembelian', qty: 1, imeis: '', note: '' })
+  const [fm, setFm] = useState({ variant_id: '', direction: 'in', reason: 'pembelian', qty: 1, imeis: '', note: '', mitra_id: '', unit_value: 0 })
   const [availImeis, setAvailImeis] = useState([]); const [existImeis, setExistImeis] = useState([])
   const [cf, setCf] = useState(null); const ask = (message, action) => setCf({ message, action })
 
@@ -30,27 +31,30 @@ export default function StokKartu() {
 
   async function load() {
     setLoading(true)
-    const [p, v, m] = await Promise.all([
+    const [p, v, m, pt] = await Promise.all([
       supabase.from('products').select('id,name,stock_type,category').eq('status', 'active').order('name'),
-      supabase.from('product_variants').select('id,product_id,storage,color,stock_qty'),
-      supabase.from('stock_movements').select('*').order('created_at', { ascending: false })
+      supabase.from('product_variants').select('id,product_id,storage,color,stock_qty,hpp'),
+      supabase.from('stock_movements').select('*').order('created_at', { ascending: false }).limit(1000),
+      supabase.from('consignment_partners').select('id,name').order('name')
     ])
     if (p.error) toast.error('Produk: ' + p.error.message)
     if (v.error) toast.error('Varian: ' + v.error.message)
-    if (m.error) toast.error('Mutasi: ' + m.error.message + ' (jalankan SQL stock_movements dulu)')
+    if (m.error) toast.error('Mutasi: ' + m.error.message)
+    if (pt.error) toast.error('Mitra: ' + pt.error.message)
     const pmap = {}; (p.data || []).forEach(x => pmap[x.id] = x)
     setVariants((v.data || []).filter(x => pmap[x.product_id]).map(x => ({ ...x, stock_type: pmap[x.product_id].stock_type, pname: pmap[x.product_id].name, label: vlabel(x) })))
-    setMoves(m.data || []); setLoading(false)
+    setMoves(m.data || []); setPartners(pt.data || []); setLoading(false)
   }
 
   const grouped = []
   variants.forEach(v => { let g = grouped.find(x => x.pname === v.pname); if (!g) { g = { pname: v.pname, items: [] }; grouped.push(g) } g.items.push(v) })
+  const ptmap = {}; partners.forEach(x => ptmap[x.id] = x.name)
 
   const fMoves = moves.filter(x => {
     const d = (x.created_at || '').slice(0, 10)
     if (d < from || d > to) return false
     if (dirFilter !== 'all' && x.direction !== dirFilter) return false
-    if (q) { const s = q.toLowerCase(); const hay = ((x.product_name || '') + ' ' + (x.variant_label || '') + ' ' + (x.imei || '') + ' ' + (x.note || '')).toLowerCase(); if (!hay.includes(s)) return false }
+    if (q) { const s = q.toLowerCase(); const hay = ((x.product_name || '') + ' ' + (x.variant_label || '') + ' ' + (x.imei || '') + ' ' + (x.note || '') + ' ' + (ptmap[x.mitra_id] || '')).toLowerCase(); if (!hay.includes(s)) return false }
     return true
   })
   const inSum = fMoves.filter(x => x.direction === 'in').reduce((a, x) => a + (+x.qty || 0), 0)
@@ -58,10 +62,11 @@ export default function StokKartu() {
 
   function setDir(d) { setFm(f => ({ ...f, direction: d, reason: d === 'in' ? 'pembelian' : 'rusak' })) }
   async function pickVariant(id) {
-    setFm(f => ({ ...f, variant_id: id, imeis: '', reason: f.direction === 'in' ? 'pembelian' : 'rusak' }))
+    setFm(f => ({ ...f, variant_id: id, imeis: '', reason: f.direction === 'in' ? 'pembelian' : 'rusak', unit_value: 0 }))
     setAvailImeis([]); setExistImeis([])
     if (!id) return
     const vrow = variants.find(v => v.id === id)
+    if (vrow) setFm(f => ({ ...f, unit_value: +vrow.hpp || 0 })) // default harga titipan = HPP varian
     if (vrow?.stock_type === 'imei') {
       const { data } = await supabase.from('product_imeis').select('imei,status').eq('variant_id', id)
       setExistImeis((data || []).map(x => x.imei))
@@ -73,6 +78,11 @@ export default function StokKartu() {
     e.preventDefault()
     const vrow = variants.find(v => v.id === fm.variant_id)
     if (!vrow) return toast.error('Pilih produk/varian dulu')
+    const needMitra = isCons(fm.reason)
+    if (needMitra && !fm.mitra_id) return toast.error('Pilih mitra untuk konsinyasi')
+    const uv = needMitra ? (+fm.unit_value || 0) : 0
+    if (needMitra && uv <= 0) return toast.error('Harga titipan per unit wajib > 0 (isi modal/harga titipannya)')
+    const mf = { mitra_id: needMitra ? fm.mitra_id : null, unit_value: uv }
     try {
       if (vrow.stock_type === 'imei') {
         const list = (fm.imeis || '').split('\n').map(s => s.trim()).filter(Boolean)
@@ -82,27 +92,20 @@ export default function StokKartu() {
         if (fm.direction === 'in') {
           const toInsert = list.filter(im => !existImeis.includes(im))
           const toRevive = list.filter(im => existImeis.includes(im))
-          if (toInsert.length) {
-            const { error } = await supabase.from('product_imeis').insert(toInsert.map(im => ({ variant_id: vrow.id, imei: im, status: 'available' })))
-            if (error) throw error
-          }
-          if (toRevive.length) {
-            const { error } = await supabase.from('product_imeis').update({ status: 'available' }).in('imei', toRevive)
-            if (error) throw error
-          }
-          // FIX: error insert mutasi sekarang dicek — tidak gagal diam-diam lagi
-          const { error: eMove } = await supabase.from('stock_movements').insert(list.map(im => ({ variant_id: vrow.id, product_name: vrow.pname, variant_label: vrow.label, direction: 'in', reason: fm.reason, qty: 1, imei: im, note: fm.note || null, created_by: user?.username || '-' })))
-          if (eMove) throw new Error('Gagal catat mutasi: ' + eMove.message + ' (cek tabel stock_movements)')
-          toast.success(toRevive.length ? `${list.length} IMEI masuk (${toRevive.length} diaktifkan ulang)` : `${list.length} IMEI masuk`)
+          if (toInsert.length) { const { error } = await supabase.from('product_imeis').insert(toInsert.map(im => ({ variant_id: vrow.id, imei: im, status: 'available' }))); if (error) throw error }
+          if (toRevive.length) { const { error } = await supabase.from('product_imeis').update({ status: 'available' }).in('imei', toRevive); if (error) throw error }
+          const { error: eMove } = await supabase.from('stock_movements').insert(list.map(im => ({ variant_id: vrow.id, product_name: vrow.pname, variant_label: vrow.label, direction: 'in', reason: fm.reason, qty: 1, imei: im, note: fm.note || null, created_by: user?.username || '-', ...mf })))
+          if (eMove) throw new Error('Gagal catat mutasi: ' + eMove.message)
+          toast.success(needMitra ? `${list.length} unit titipan ${ptmap[fm.mitra_id] || ''} tercatat (hutang +${rp(uv * list.length)})` : `${list.length} IMEI masuk`)
         } else {
           const notAvail = list.filter(im => !availImeis.includes(im))
           if (notAvail.length) return toast.error('IMEI tidak tersedia: ' + notAvail.join(', '))
           const st = IMEI_OUT_STATUS[fm.reason] || 'keluar'
           const { error } = await supabase.from('product_imeis').update({ status: st }).in('imei', list)
           if (error) throw error
-          const { error: eMove } = await supabase.from('stock_movements').insert(list.map(im => ({ variant_id: vrow.id, product_name: vrow.pname, variant_label: vrow.label, direction: 'out', reason: fm.reason, qty: 1, imei: im, note: fm.note || null, created_by: user?.username || '-' })))
-          if (eMove) throw new Error('Gagal catat mutasi: ' + eMove.message + ' (cek tabel stock_movements)')
-          toast.success(`${list.length} unit keluar (${reasonLabel('out', fm.reason)})`)
+          const { error: eMove } = await supabase.from('stock_movements').insert(list.map(im => ({ variant_id: vrow.id, product_name: vrow.pname, variant_label: vrow.label, direction: 'out', reason: fm.reason, qty: 1, imei: im, note: fm.note || null, created_by: user?.username || '-', ...mf })))
+          if (eMove) throw new Error('Gagal catat mutasi: ' + eMove.message)
+          toast.success(needMitra ? `Retur ke ${ptmap[fm.mitra_id] || ''} tercatat (hutang -${rp(uv * list.length)})` : `${list.length} unit keluar (${reasonLabel('out', fm.reason)})`)
         }
       } else {
         const qty = +fm.qty || 0
@@ -112,11 +115,11 @@ export default function StokKartu() {
         const next = fm.direction === 'in' ? cur + qty : cur - qty
         const { error } = await supabase.from('product_variants').update({ stock_qty: next }).eq('id', vrow.id)
         if (error) throw error
-        const { error: e2 } = await supabase.from('stock_movements').insert({ variant_id: vrow.id, product_name: vrow.pname, variant_label: vrow.label, direction: fm.direction, reason: fm.reason, qty, note: fm.note || null, created_by: user?.username || '-' })
-        if (e2) throw new Error('Stok terupdate tapi gagal catat mutasi: ' + e2.message + ' (cek tabel stock_movements)')
-        toast.success(fm.direction === 'in' ? 'Stok masuk tercatat' : 'Stok keluar tercatat')
+        const { error: e2 } = await supabase.from('stock_movements').insert({ variant_id: vrow.id, product_name: vrow.pname, variant_label: vrow.label, direction: fm.direction, reason: fm.reason, qty, note: fm.note || null, created_by: user?.username || '-', ...mf })
+        if (e2) throw new Error('Stok terupdate tapi gagal catat mutasi: ' + e2.message)
+        toast.success(needMitra ? (fm.direction === 'in' ? `Titipan ${ptmap[fm.mitra_id] || ''} tercatat (hutang +${rp(uv * qty)})` : `Retur ke ${ptmap[fm.mitra_id] || ''} tercatat (hutang -${rp(uv * qty)})`) : (fm.direction === 'in' ? 'Stok masuk tercatat' : 'Stok keluar tercatat'))
       }
-      setShowForm(false); setFm({ variant_id: '', direction: 'in', reason: 'pembelian', qty: 1, imeis: '', note: '' }); setAvailImeis([]); setExistImeis([])
+      setShowForm(false); setFm({ variant_id: '', direction: 'in', reason: 'pembelian', qty: 1, imeis: '', note: '', mitra_id: '', unit_value: 0 }); setAvailImeis([]); setExistImeis([])
       load()
     } catch (err) { toast.error('Gagal: ' + err.message) }
   }
@@ -146,7 +149,7 @@ export default function StokKartu() {
   }
 
   if (loading) return <div className="p-8 flex justify-center"><div className="w-8 h-8 border-4 border-[#0058A3] border-t-transparent rounded-full animate-spin" /></div>
-  const actions = (<button onClick={() => { setFm({ variant_id: '', direction: 'in', reason: 'pembelian', qty: 1, imeis: '', note: '' }); setAvailImeis([]); setExistImeis([]); setShowForm(true) }} className="flex items-center gap-2 px-4 py-2 bg-[#0058A3] text-white rounded-lg hover:bg-[#004080] shadow-sm text-sm font-medium"><Plus className="w-4 h-4" />Catat Mutasi Stok</button>)
+  const actions = (<button onClick={() => { setFm({ variant_id: '', direction: 'in', reason: 'pembelian', qty: 1, imeis: '', note: '', mitra_id: '', unit_value: 0 }); setAvailImeis([]); setExistImeis([]); setShowForm(true) }} className="flex items-center gap-2 px-4 py-2 bg-[#0058A3] text-white rounded-lg hover:bg-[#004080] shadow-sm text-sm font-medium"><Plus className="w-4 h-4" />Catat Mutasi Stok</button>)
   const vrow = variants.find(v => v.id === fm.variant_id)
   return (
     <div className="p-6 lg:p-8">
@@ -163,7 +166,7 @@ export default function StokKartu() {
           <span className="text-gray-400">s/d</span>
           <input type="date" value={to} onChange={e => setTo(e.target.value)} className="text-sm border rounded px-2 py-1.5 outline-none focus:ring-2 focus:ring-[#0058A3]" />
           <select value={dirFilter} onChange={e => setDirFilter(e.target.value)} className="text-sm border rounded px-2 py-1.5 bg-white"><option value="all">Semua arah</option><option value="in">Masuk</option><option value="out">Keluar</option></select>
-          <div className="flex-1 min-w-[160px] relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Cari produk / IMEI / catatan..." className="w-full pl-9 pr-3 py-1.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#0058A3]" /></div>
+          <div className="flex-1 min-w-[160px] relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Cari produk / IMEI / mitra / catatan..." className="w-full pl-9 pr-3 py-1.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#0058A3]" /></div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -174,7 +177,7 @@ export default function StokKartu() {
                   <td className="p-3 text-sm text-gray-600 whitespace-nowrap">{new Date(x.created_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
                   <td className="p-3 text-sm"><p className="font-medium truncate max-w-[200px]">{x.product_name || '—'}</p><p className="text-xs text-gray-500">{x.variant_label || ''}</p></td>
                   <td className="p-3"><span className={`px-2 py-0.5 rounded text-xs font-medium ${x.direction === 'in' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>{x.direction === 'in' ? 'MASUK' : 'KELUAR'}</span></td>
-                  <td className="p-3 text-sm text-gray-700">{reasonLabel(x.direction, x.reason)}{x.created_by && <span className="block text-[11px] text-gray-400">oleh {x.created_by}</span>}</td>
+                  <td className="p-3 text-sm text-gray-700">{reasonLabel(x.direction, x.reason)}{x.mitra_id && <span className="block text-[11px] text-gray-400">Mitra: {ptmap[x.mitra_id] || '—'}</span>}{x.created_by && <span className="block text-[11px] text-gray-400">oleh {x.created_by}</span>}</td>
                   <td className={`p-3 text-sm text-right font-bold ${x.direction === 'in' ? 'text-green-600' : 'text-red-600'}`}>{x.direction === 'in' ? '+' : '-'}{x.qty}</td>
                   <td className="p-3 text-xs font-mono text-gray-500">{x.imei || '—'}</td>
                   <td className="p-3 text-sm text-gray-600 max-w-[200px] truncate">{x.note || '—'}</td>
@@ -207,6 +210,22 @@ export default function StokKartu() {
               {REASONS[fm.direction].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </div>
+          {isCons(fm.reason) && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-3">
+              <div><label className="block text-sm font-medium text-amber-800 mb-1.5">Mitra (pemilik titipan) *</label>
+                <select required value={fm.mitra_id} onChange={e => setFm({ ...fm, mitra_id: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-amber-400">
+                  <option value="">— pilih mitra —</option>
+                  {partners.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                </select>
+                {!partners.length && <p className="text-[11px] text-red-500 mt-1">Belum ada mitra — tambahkan dulu di halaman Konsinyasi.</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-amber-800 mb-1.5">Harga Titipan / Unit (nilai hutang ke mitra) *</label>
+                <RupiahInput value={fm.unit_value} onChange={x => setFm({ ...fm, unit_value: x })} className="w-full px-4 py-2.5 border rounded-lg outline-none text-right focus:ring-2 focus:ring-amber-400" placeholder="0" />
+                <p className="text-[11px] text-amber-700 mt-1">Hutang otomatis tercatat di halaman Konsinyasi. Samakan juga HPP varian di Master Barang dengan harga ini agar laba akurat.</p>
+              </div>
+            </div>
+          )}
           {vrow && vrow.stock_type === 'imei' ? (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">IMEI (satu per baris) *</label>
@@ -217,10 +236,10 @@ export default function StokKartu() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Jumlah (unit/pcs) *</label>
               <input type="number" min="1" required value={fm.qty} onChange={e => setFm({ ...fm, qty: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-[#0058A3]" />
-              {vrow && <p className="text-[11px] text-gray-400 mt-0.5">Stok sekarang: {+vrow.stock_qty || 0} → akan jadi: {fm.direction === 'in' ? (+vrow.stock_qty || 0) + (+fm.qty || 0) : Math.max(0, (+vrow.stock_qty || 0) - (+fm.qty || 0))}</p>}
+              {vrow && <p className="text-[11px] text-gray-400 mt-0.5">Stok sekarang: {+vrow.stock_qty || 0} → akan jadi: {fm.direction === 'in' ? (+vrow.stock_qty || 0) + (+fm.qty || 0) : Math.max(0, (+vrow.stock_qty || 0) - (+fm.qty || 0))}{isCons(fm.reason) ? ` · hutang: ${rp((+fm.unit_value || 0) * (+fm.qty || 0))}` : ''}</p>}
             </div>
           )}
-          <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Catatan</label><input value={fm.note} onChange={e => setFm({ ...fm, note: e.target.value })} placeholder="cth: layar pecah / opname gudang / dari supplier X" className="w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-[#0058A3]" /></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Catatan</label><input value={fm.note} onChange={e => setFm({ ...fm, note: e.target.value })} placeholder="cth: titipan Bpk. Andi / layar pecah / opname gudang" className="w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-[#0058A3]" /></div>
         </form>
       </Modal>
       <Confirm open={!!cf} danger message={cf?.message} confirmText="Ya, Hapus" onClose={() => setCf(null)} onConfirm={async () => { const a = cf.action; setCf(null); await a() }} />
