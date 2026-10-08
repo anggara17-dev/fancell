@@ -68,6 +68,6 @@ export default function Dashboard() {
           <div className="space-y-1 max-h-[320px] overflow-y-auto">{lowList.map((p,i)=>(<div key={i} className="flex justify-between items-center py-3 px-2 hover:bg-gray-50 rounded"><div className="min-w-0"><p className="text-sm font-medium truncate">{p.name}</p><p className="text-xs text-gray-500">{p.cat} · {p.label}</p></div><span className={`text-sm font-bold px-2.5 py-1 rounded ${p.kind==='Habis'?'text-red-600 bg-red-50':'text-[#0058A3] bg-blue-50'}`}>{p.sisa} {p.kind}</span></div>))}</div>}
         </div>
       </div>
-      <p className="text-center text-xs text-gray-400">Design & Develop By <span className="font-semibold text-gray-600">Fancell Team</span></p>
+      <p className="text-center text-xs text-gray-400">Design & Develop By <span className="font-semibold text-gray-600">Depgo</span></p>
     </div> )
 }
