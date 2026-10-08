@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Panduan Penggunaan — Fancell POS</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #1f2937; font-size: 12.5px; line-height: 1.65; margin: 0; background: #eef2f7; }
+  .page { max-width: 800px; margin: 0 auto; padding: 28px 34px 40px; background: #fff; min-height: 100vh; box-shadow: 0 0 20px rgba(0,0,0,.06); }
+  @media print { body { background: #fff; } .page { max-width: none; margin: 0; padding: 0; box-shadow: none; min-height: auto; } }
+  .cover { background: linear-gradient(135deg,#0058A3,#003466); color: #fff; padding: 60px 40px; border-radius: 14px; margin-bottom: 30px; }
+  .cover h1 { margin: 0 0 6px; font-size: 34px; letter-spacing: 1px; }
+  .cover p { margin: 4px 0; opacity: .9; }
+  .cover .ver { margin-top: 26px; font-size: 12px; opacity: .65; }
+  h2 { color: #0058A3; border-bottom: 2.5px solid #0058A3; padding-bottom: 5px; margin-top: 34px; font-size: 19px; page-break-after: avoid; }
+  h3 { color: #003466; margin-bottom: 6px; font-size: 14.5px; page-break-after: avoid; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; page-break-inside: avoid; }
+  th { background: #0058A3; color: #fff; text-align: left; padding: 7px 10px; font-size: 11.5px; }
+  td { border: 1px solid #d1d5db; padding: 7px 10px; vertical-align: top; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  ol, ul { margin: 6px 0; padding-left: 22px; }
+  li { margin: 3px 0; }
+  .tip { background: #ecfdf5; border-left: 4px solid #10b981; padding: 9px 14px; border-radius: 6px; margin: 10px 0; page-break-inside: avoid; }
+  .warn { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 9px 14px; border-radius: 6px; margin: 10px 0; page-break-inside: avoid; }
+  .danger { background: #fef2f2; border-left: 4px solid #ef4444; padding: 9px 14px; border-radius: 6px; margin: 10px 0; page-break-inside: avoid; }
+  .step { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 16px; margin: 8px 0; page-break-inside: avoid; }
+  .step b.t { color: #0058A3; display: block; margin-bottom: 4px; }
+  kbd { background: #e5e7eb; border: 1px solid #9ca3af; border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; font-size: 11px; font-family: monospace; }
+  .toc td { border: none; padding: 3px 8px; }
+  .toc tr:nth-child(even) td { background: transparent; }
+  .footer { margin-top: 40px; text-align: center; color: #9ca3af; font-size: 11px; border-top: 1px solid #e5e7eb; padding-top: 12px; }
+  .pagebreak { page-break-before: always; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="cover">
+  <h1>FANCELL POS</h1>
+  <p style="font-size:17px">Panduan Penggunaan Aplikasi — Kasir, Stok, Konsinyasi &amp; Pembukuan</p>
+  <p>Untuk: Owner · Kasir · Gudang</p>
+  <div class="ver">Versi Dokumen 1.0 — Disesuaikan dengan fitur aplikasi terkini</div>
+</div>
+
+<h2>📚 Daftar Isi</h2>
+<table class="toc">
+  <tr><td>1. Aturan Umum &amp; Hak Akses</td><td style="text-align:right">Hal. 1</td></tr>
+  <tr><td>2. Masuk Aplikasi (Login)</td><td style="text-align:right">Hal. 1</td></tr>
+  <tr><td>3. Dashboard</td><td style="text-align:right">Hal. 1</td></tr>
+  <tr><td>4. Master Barang — Membuat Produk</td><td style="text-align:right">Hal. 2</td></tr>
+  <tr><td>5. Stok Masuk / Keluar — Jantungnya Gudang</td><td style="text-align:right">Hal. 2</td></tr>
+  <tr><td>6. POS Kasir — Transaksi Jualan &amp; Scanner IMEI</td><td style="text-align:right">Hal. 3</td></tr>
+  <tr><td>7. Riwayat Transaksi — Edit, Void, Tutup Kasir</td><td style="text-align:right">Hal. 4</td></tr>
+  <tr><td>8. Konsinyasi (Titip Jual) — Hutang Mitra</td><td style="text-align:right">Hal. 5</td></tr>
+  <tr><td>9. Tracking Garansi</td><td style="text-align:right">Hal. 5</td></tr>
+  <tr><td>10. Laba Rugi</td><td style="text-align:right">Hal. 6</td></tr>
+  <tr><td>11. Keuntungan &amp; Modal (Modal / Prive)</td><td style="text-align:right">Hal. 6</td></tr>
+  <tr><td>12. Pengaturan — Profil Toko &amp; User</td><td style="text-align:right">Hal. 6</td></tr>
+  <tr><td>13. Notifikasi &amp; Log Aktivitas</td><td style="text-align:right">Hal. 7</td></tr>
+  <tr><td>14. Alur Harian yang Disarankan (Checklist)</td><td style="text-align:right">Hal. 7</td></tr>
+  <tr><td>15. Aturan Emas — Jangan Dilanggar</td><td style="text-align:right">Hal. 8</td></tr>
+</table>
+
+<div class="pagebreak"></div>
+<h2>1. Aturan Umum &amp; Hak Akses</h2>
+<table>
+  <tr><th>Role</th><th>Bisa Mengakses</th><th>Tidak Bisa</th></tr>
+  <tr><td><b>Owner</b></td><td>Semua menu</td><td>—</td></tr>
+  <tr><td><b>Kasir</b></td><td>Dashboard, POS Kasir, Metode Bayar, Printer, Master Barang, Stok Masuk/Keluar, Riwayat, Konsinyasi, Garansi</td><td>Laba Rugi, Keuntungan &amp; Modal, Pengaturan</td></tr>
+  <tr><td><b>Gudang</b></td><td>Master Barang, Stok Masuk/Keluar</td><td>Semua menu lain</td></tr>
+</table>
+<div class="tip">💡 <b>Prinsip utama:</b> stok barang TIDAK pernah diisi manual di Master Barang. Semua perubahan stok WAJIB lewat menu <b>Stok Masuk/Keluar</b> supaya selalu ada jejak (siapa, kapan, kenapa).</div>
+
+<h2>2. Masuk Aplikasi (Login)</h2>
+<ol>
+  <li>Buka alamat aplikasi di browser (disarankan Chrome/Edge).</li>
+  <li>Klik kolom <b>Username</b> → pilih nama user Anda dari daftar.</li>
+  <li>Ketik <b>Password</b> — klik ikon 👁 bila ingin memastikan ketikan.</li>
+  <li>Klik <b>Masuk</b>.</li>
+</ol>
+<div class="warn">⚠️ Password tidak boleh dibagikan. Setiap transaksi tercatat atas nama user yang login — kesalahan bisa dilacak.</div>
+
+<h2>3. Dashboard</h2>
+<p>Halaman pertama setelah login. Menampilkan ringkasan hari ini: Penjualan, HPP, Laba Kotor, jumlah transaksi, stok menipis/habis, dan grafik penjualan 7 hari terakhir.</p>
+<div class="tip">💡 Cek kartu <b>Stok Menipis/Habis</b> setiap pagi — itu daftar yang perlu direstock hari ini.</div>
+
+<h2>4. Master Barang — Membuat Produk</h2>
+<p>Menu ini untuk <b>menambah/mengedit data produk</b> (nama, kategori, varian, harga), BUKAN untuk mengisi stok.</p>
+<div class="step"><b class="t">Langkah menambah produk baru</b>
+  <ol>
+    <li>Klik <b>Tambah Produk</b>.</li>
+    <li>Isi Nama, Kategori, Tipe (Baru/Second), Brand, Model.</li>
+    <li>Pilih <b>Kategori</b> — jenis kategori menentukan cara stok dihitung: <b>per IMEI (unit HP)</b> atau <b>jumlah (pcs aksesoris)</b>.</li>
+    <li>Untuk HP: tambahkan varian (mis. 128GB Hitam) dan isi <b>Harga Jual</b> + <b>HPP/Modal</b>. Kolom IMEI boleh dikosongkan — diisi nanti lewat Stok Masuk.</li>
+    <li>Untuk aksesoris: isi Harga Jual &amp; HPP per varian.</li>
+    <li>Klik <b>Simpan</b>. Produk muncul dengan stok <b>0</b>.</li>
+  </ol>
+</div>
+<div class="tip">💡 <b>Isi HPP Massal</b>: tombol untuk menghitung HPP otomatis dari persentase harga jual (mis. 90 = HPP 90% dari harga jual). Sangat berguna setelah memasukkan banyak produk.</div>
+<div class="warn">⚠️ Produk berlabel <b>TITIPAN · nama mitra</b> berarti barang konsinyasi — label ini muncul OTOMATIS saat barang titipan masuk lewat Stok Masuk/Keluar. Jangan mengubah tipe produk ini manual.</div>
+
+<h2>5. Stok Masuk / Keluar — Jantungnya Gudang</h2>
+<p>Semua pergerakan barang tercatat di sini dengan <b>alasan</b>. Stok di Master Barang otomatis mengikuti.</p>
+<h3>5.1 Barang Masuk</h3>
+<div class="step"><b class="t">Cara mencatat barang masuk</b>
+  <ol>
+    <li>Klik <b>Catat Mutasi Stok</b>.</li>
+    <li>Pilih Produk/Varian.</li>
+    <li>Arah: <b>Masuk</b>.</li>
+    <li>Pilih <b>Alasan</b>:
+      <ul>
+        <li><b>Pembelian / Restock</b> — barang beli sendiri</li>
+        <li><b>Barang Konsinyasi (Titipan Mitra)</b> — barang titipan; akan muncul kolom tambahan (lihat bab 8)</li>
+        <li><b>Stok Awal</b> — penyesuaian awal pemakaian aplikasi</li>
+        <li><b>Retur dari Customer</b>, <b>Hasil Opname (+)</b>, <b>Lainnya</b></li>
+      </ul>
+    </li>
+    <li>Untuk HP: ketik <b>IMEI satu per baris</b>. Untuk aksesoris: isi <b>jumlah (pcs)</b>.</li>
+    <li>Isi catatan bila perlu (mis. "dari supplier X") → <b>Simpan Mutasi</b>.</li>
+  </ol>
+</div>
+<h3>5.2 Barang Keluar (selain penjualan)</h3>
+<p>Pilih arah <b>Keluar</b> lalu pilih alasan: <b>Barang Rusak</b>, <b>Barang Hilang</b>, <b>Dipakai Internal</b>, <b>Retur ke Supplier</b>, <b>Hasil Opname (−)</b>, atau <b>Retur Konsinyasi ke Mitra</b>.</p>
+<div class="warn">⚠️ <b>Penjualan TIDAK dicatat di sini</b> — otomatis tercatat saat kasir bertransaksi di POS. Hapus mutasi manual akan mengembalikan stok otomatis, gunakan hanya untuk salah input.</div>
+
+<h2>6. POS Kasir — Transaksi Jualan &amp; Scanner IMEI</h2>
+<div class="step"><b class="t">Alur penjualan standar</b>
+  <ol>
+    <li>Kursor otomatis aktif di kotak pencarian.</li>
+    <li><b>Scan IMEI</b> dengan barcode scanner (tembak stiker/dus unit) → unit langsung masuk keranjang. Atau klik kartu produk.</li>
+    <li>Untuk HP tanpa scanner: klik produk → pilih varian → pilih IMEI yang tersedia.</li>
+    <li>Atur <b>Diskon</b> (Rp/%) bila ada. Centang <b>Tukar Tambah</b> bila pelanggan menukar unit lama (isi nama unit + nilai tukar).</li>
+    <li>Pilih <b>Garansi</b> (toko 1/3/6/12 bulan atau resmi).</li>
+    <li>Klik <b>Bayar</b> → isi nama &amp; no. HP pelanggan.</li>
+    <li>Pilih <b>metode pembayaran</b> — bisa lebih dari satu (split payment, mis. tunai + QRIS). Untuk cicilan, isi keterangan kontrak/tenor pada kolom yang tersedia.</li>
+    <li>Klik <b>Isi sisanya</b> agar nominal terisi otomatis → <b>Selesaikan Pembayaran</b>.</li>
+    <li>Cetak struk (tombol Print Struk) → selesai. Stok, mutasi, dan pembukuan terupdate otomatis.</li>
+  </ol>
+</div>
+<div class="tip">💡 Tombol <b>[Esc]</b> menutup pop-up apa pun. Kartu produk bertanda <b>TITIPAN</b> berarti barang konsinyasi — penjualannya otomatis tercatat di kartu mitra.</div>
+<div class="warn">⚠️ Jika scanner tidak berbunyi/masuk: pastikan kursor ada di kotak pencarian, dan mode scanner adalah <i>HID Keyboard</i> (tes: tembak barcode di Notepad, harus keluar angka + Enter).</div>
+
+<h2>7. Riwayat Transaksi — Edit, Void, Tutup Kasir</h2>
+<table>
+  <tr><th>Aksi</th><th>Kapan Dipakai</th><th>Akibatnya</th></tr>
+  <tr><td><b>👁 Detail</b></td><td>Melihat rincian transaksi</td><td>—</td></tr>
+  <tr><td><b>✏️ Edit / Retur</b></td><td>Salah ketik nama pelanggan, atau transaksi batal</td><td>Ubah status ke <b>Void</b> → stok kembali otomatis</td></tr>
+  <tr><td><b>🗑 Hapus</b></td><td>Transaksi salah total</td><td>Data dihapus, stok dikembalikan</td></tr>
+</table>
+<div class="step"><b class="t">Tutup Kasir (Z-Report) — WAJIB setiap malam</b>
+  <ol>
+    <li>Klik <b>Tutup Kasir (Z-Report)</b>.</li>
+    <li>Periksa: total penjualan, HPP, biaya admin, laba bersih, rincian per metode bayar.</li>
+    <li>Cetak salinan → klik <b>Tutup Kasir</b> untuk menyimpan permanen.</li>
+    <li>Hitung uang fisik di kasir, cocokkan dengan laporan. Selisih dicatat manual.</li>
+  </ol>
+</div>
+<div class="danger">🚫 Void/hapus TIDAK mengubah hutang konsinyasi — hutang ke mitra hanya berkurang lewat pembayaran atau retur ke mitra (bab 8).</div>
+
+<h2>8. Konsinyasi (Titip Jual) — Hutang Mitra</h2>
+<p>Setiap mitra punya "kartu" berisi: <b>Sisa Hutang</b>, total titipan, yang sudah dibayar, dan jumlah unit.</p>
+<h3>8.1 Barang titipan datang</h3>
+<ol>
+  <li>Pastikan mitra sudah terdaftar (Tambah Mitra di halaman Konsinyasi).</li>
+  <li>Buka <b>Stok Masuk/Keluar</b> → Catat Mutasi → arah <b>Masuk</b>.</li>
+  <li>Alasan: <b>Barang Konsinyasi (Titipan Mitra)</b>.</li>
+  <li>Muncul kolom kuning: pilih <b>Mitra</b> + isi <b>Harga Titipan / Unit</b> (= nilai hutang ke mitra per unit).</li>
+  <li>Simpan → stok bertambah, <b>hutang otomatis tercatat</b> di kartu mitra.</li>
+</ol>
+<h3>8.2 Barang titipan terjual</h3>
+<p>Cukup jual lewat POS seperti biasa. Kartu mitra otomatis menandai unit <b>TERJUAL</b>. Hutang tidak berubah (memang tercatat sejak barang masuk).</p>
+<h3>8.3 Membayar mitra</h3>
+<ol>
+  <li>Halaman Konsinyasi → kartu mitra → <b>Bayar</b>.</li>
+  <li>Isi nominal (bila pas dengan sisa hutang → status otomatis <b>LUNAS</b>), tanggal, catatan.</li>
+  <li>Semua riwayat masuk/keluar/bayar ada di tombol <b>Riwayat</b> pada kartu mitra.</li>
+</ol>
+<h3>8.4 Mengembalikan barang ke mitra</h3>
+<p>Stok Masuk/Keluar → arah <b>Keluar</b> → alasan <b>Retur Konsinyasi ke Mitra</b> → pilih mitra + harga titipan → hutang berkurang otomatis.</p>
+<div class="warn">⚠️ Saat input barang titipan, samakan <b>HPP varian</b> di Master Barang dengan harga titipan agar Laba Rugi akurat.</div>
+
+<h2>9. Tracking Garansi</h2>
+<p>Otomatis terisi dari transaksi POS yang diberi garansi. Cari dengan <b>nama pelanggan / no. invoice / IMEI</b>. Status garansi: AKTIF, SISA x HARI (kuning), HABIS (merah). Tombol <b>Surat Klaim</b> mencetak formulir klaim garansi untuk ditandatangani pelanggan.</p>
+
+<h2>10. Laba Rugi</h2>
+<p>Laporan otomatis: Pendapatan − HPP − Biaya Admin − Biaya Operasional = <b>Laba Bersih</b>. Pilih rentang tanggal (default: bulan ini). Catat pengeluaran rutin (listrik, sewa, gaji, makan) lewat tombol <b>Catat</b> di panel Biaya Operasional. HPP barang titipan sudah otomatis dihitung dari harga titipan mitra.</p>
+
+<h2>11. Keuntungan &amp; Modal (Modal / Prive)</h2>
+<table>
+  <tr><th>Istilah</th><th>Arti</th></tr>
+  <tr><td><b>Modal</b></td><td>Setoran uang owner/investor ke toko (+)</td></tr>
+  <tr><td><b>Keuntungan</b></td><td>Laba bersih akumulasi — dihitung otomatis dari transaksi</td></tr>
+  <tr><td><b>Prive</b></td><td>Uang yang diambil owner untuk keperluan pribadi (−)</td></tr>
+  <tr><td><b>Saldo</b></td><td>Modal + Keuntungan − Prive</td></tr>
+</table>
+<p>Catat setiap setoran/penarikan lewat tombol <b>Catat Modal/Prive</b>. Semua catatan bisa diedit/dihapus di tabel <b>Riwayat Modal &amp; Prive</b>.</p>
+
+<h2>12. Pengaturan — Profil Toko &amp; User</h2>
+<h3>12.1 Tab Toko</h3>
+<p>Nama toko, alamat, WhatsApp, footer struk, logo sidebar &amp; logo struk. Logo juga otomatis menjadi favicon di tab browser dan muncul di halaman login.</p>
+<h3>12.2 Tab User &amp; Hak Akses</h3>
+<div class="step"><b class="t">Menambah user baru</b>
+  <ol><li>Tambah User → isi Username (unik), Email (opsional).</li>
+  <li>Password minimal 6 karakter + ulangi di kolom konfirmasi. Klik 👁 untuk memastikan.</li>
+  <li>Pilih Role sesuai tabel di Bab 1 → Simpan.</li></ol>
+</div>
+<div class="danger">🚫 User tidak dihapus, tetapi <b>dinonaktifkan</b> (ikon 🗑). Riwayat transaksinya tetap aman. User nonaktif tidak bisa login dan tidak muncul di halaman login. Owner tidak boleh menonaktifkan akunnya sendiri.</div>
+
+<h2>13. Notifikasi &amp; Log Aktivitas</h2>
+<p>Ikon 🔔 di kanan atas berisi dua bagian:</p>
+<ul>
+  <li><b>Perlu Perhatian</b> — daftar varian yang stoknya HABIS (titik merah menyala).</li>
+  <li><b>Aktivitas Terbaru</b> — 12 pergerakan terakhir: penjualan, restock, barang rusak, void, dll, lengkap dengan waktu dan nama pelakunya. Diperbarui otomatis tiap 1 menit.</li>
+</ul>
+
+<h2>14. Alur Harian yang Disarankan (Checklist)</h2>
+<table>
+  <tr><th>Waktu</th><th>Kegiatan</th></tr>
+  <tr><td>Pagi</td><td>Cek Dashboard &amp; notifikasi stok habis → restock lewat Stok Masuk/Keluar</td></tr>
+  <tr><td>Barang datang</td><td>Catat di Stok Masuk (Pembelian / Konsinyasi sesuai sumbernya) — JANGAN tunda</td></tr>
+  <tr><td>Sepanjang hari</td><td>Semua penjualan HANYA lewat POS Kasir</td></tr>
+  <tr><td>Barang rusak/hilang</td><td>Catat di Stok Keluar dengan alasan — jangan hanya turunkan stok diam-diam</td></tr>
+  <tr><td>Malam</td><td><b>Tutup Kasir (Z-Report)</b> + cocokkan uang fisik</td></tr>
+  <tr><td>Ada pembayaran mitra</td><td>Bayar lewat halaman Konsinyasi, bukan dicatat manual</td></tr>
+  <tr><td>Akhir bulan</td><td>Cek Laba Rugi + catat biaya operasional yang belum masuk</td></tr>
+</table>
+
+<h2>15. Aturan Emas — Jangan Dilanggar</h2>
+<div class="danger">
+  <ol>
+    <li><b>Stok hanya berubah lewat Stok Masuk/Keluar atau POS</b> — tidak ada jalur lain.</li>
+    <li><b>Satu IMEI = satu unit</b> — IMEI yang sama tidak bisa terjual 2x; sistem menolak otomatis.</li>
+    <li><b>Penjualan tidak boleh dicatat manual di Stok Keluar</b> — selalu otomatis dari POS.</li>
+    <li><b>Void ≠ hutang lunas</b> — hutang konsinyasi hanya lunas lewat tombol Bayar atau Retur ke Mitra.</li>
+    <li><b>Password tidak dibagikan</b> — satu akun satu orang, semua aksi tercatat atas nama pemilik akun.</li>
+    <li><b>Z-Report setiap malam</b> — laporan tidak ditutup = buku tidak ditutup.</li>
+  </ol>
+</div>
+
+<div class="footer">Fancell POS System v1.0 — Design &amp; Develop by Depgo<br>Dokumen internal toko — tidak untuk diperjualbelikan</div>
+
+</div>
+</body>
+</html>
