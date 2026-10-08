@@ -39,17 +39,26 @@ export default function MasterBarang() {
   useEffect(() => { load() }, [])
 
   async function load() {
-    const [p, v, i, c] = await Promise.all([
+    const [p, v, i, c, consMoves, pts] = await Promise.all([
       supabase.from('products').select('*').eq('status', 'active').order('name'),
       supabase.from('product_variants').select('*'),
       supabase.from('product_imeis').select('id,variant_id,imei,status'),
-      supabase.from('categories').select('*').order('sort')
+      supabase.from('categories').select('*').order('sort'),
+      supabase.from('stock_movements').select('variant_id,mitra_id').eq('reason', 'konsinyasi').eq('direction', 'in').not('mitra_id', 'is', null),
+      supabase.from('consignment_partners').select('id,name')
     ])
     setCats(c.data || [])
-    const byProd = {}, avByVar = {}, flat = [], pmap = {}
-    ;(v.data || []).forEach(x => { (byProd[x.product_id] = byProd[x.product_id] || []).push(x); flat.push(x) })
+    const vmap = {}, byProd = {}, avByVar = {}, flat = [], pmap = {}
+    ;(v.data || []).forEach(x => { (byProd[x.product_id] = byProd[x.product_id] || []).push(x); vmap[x.id] = x.product_id; flat.push(x) })
     ;(i.data || []).forEach(x => { if (x.status === 'available') avByVar[x.variant_id] = (avByVar[x.variant_id] || 0) + 1 })
     ;(p.data || []).forEach(x => pmap[x.id] = x)
+    const ptmap = {}; (pts.data || []).forEach(x => ptmap[x.id] = x.name)
+    // peta produk -> nama mitra titipan (dideteksi dari mutasi konsinyasi)
+    const consByProduct = {}
+    ;(consMoves.data || []).forEach(m => { const pid = vmap[m.variant_id]; const nm = ptmap[m.mitra_id]; if (pid && nm) { (consByProduct[pid] = consByProduct[pid] || new Set()).add(nm) } })
+    // sinkronkan tipe produk utk badge TITIPAN di POS (diam-diam, sekali saja)
+    const needFix = (p.data || []).filter(x => consByProduct[x.id] && x.type !== 'consignment')
+    if (needFix.length) supabase.from('products').update({ type: 'consignment' }).in('id', needFix.map(x => x.id)).then(() => {}, () => {})
     setAllVariants(flat.map(x => ({ ...x, pname: pmap[x.product_id]?.name || '—' })))
     setRows((p.data || []).map(prod => {
       const vs = byProd[prod.id] || []
@@ -57,7 +66,7 @@ export default function MasterBarang() {
         ? vs.reduce((a, x) => a + (avByVar[x.id] || 0), 0)
         : vs.reduce((a, x) => a + (+x.stock_qty || 0), 0)
       const harga = vs.length ? Math.min(...vs.map(x => +x.harga_jual || 0)) : 0
-      return { ...prod, varCount: vs.length, stok, harga }
+      return { ...prod, type: consByProduct[prod.id] ? 'consignment' : prod.type, consMitra: consByProduct[prod.id] ? [...consByProduct[prod.id]].join(', ') : null, varCount: vs.length, stok, harga }
     }))
     setLoading(false)
   }
@@ -66,7 +75,8 @@ export default function MasterBarang() {
     !q ||
     r.name?.toLowerCase().includes(q.toLowerCase()) ||
     r.brand?.toLowerCase().includes(q.toLowerCase()) ||
-    r.category?.toLowerCase().includes(q.toLowerCase())
+    r.category?.toLowerCase().includes(q.toLowerCase()) ||
+    r.consMitra?.toLowerCase().includes(q.toLowerCase())
   )
 
   function pickPhoto(e) {
@@ -144,20 +154,18 @@ export default function MasterBarang() {
       } else {
         await supabase.from('product_variants').delete().eq('product_id', pid)
         for (const v of fd.variants) {
-          const { data: vr, error: e2 } = await supabase.from('product_variants').insert({ product_id: pid, storage: v.storage || null, color: v.color || null, harga_jual: +v.harga_jual || 0, hpp: +v.hpp || 0, stock_qty: isImei ? 0 : (+v.stock_qty || 0) }).select().single()
+          const { data: vr, error: e2 } = await supabase.from('product_variants').insert({ product_id: pid, storage: v.storage || null, color: v.color || null, harga_jual: +v.harga_jual || 0, hpp: +v.hpp || 0, stock_qty: 0 }).select().single()
           if (e2) throw e2
           if (isImei && v.imeis) {
             const arr = v.imeis.split('\n').map(s => s.trim()).filter(Boolean)
             if (arr.length) {
               await supabase.from('product_imeis').insert(arr.map(im => ({ variant_id: vr.id, imei: im, status: 'available' })))
-              await supabase.from('stock_movements').insert(arr.map(im => ({ variant_id: vr.id, product_name: fd.name.trim(), variant_label: [v.color, v.storage].filter(x => x && x !== '-').join(' - ') || 'Standar', direction: 'in', reason: 'stok_awal', qty: 1, imei: im, note: 'Stok awal saat tambah produk' })))
+              await supabase.from('stock_movements').insert(arr.map(im => ({ variant_id: vr.id, product_name: fd.name.trim(), variant_label: [v.color, v.storage].filter(x => x && x !== '-').join(' - ') || 'Standar', direction: 'in', reason: 'stok_awal', qty: 1, imei: im, note: 'IMEI awal saat buat produk' })))
             }
-          } else if (!isImei && (+v.stock_qty || 0) > 0) {
-            await supabase.from('stock_movements').insert({ variant_id: vr.id, product_name: fd.name.trim(), variant_label: [v.color, v.storage].filter(x => x && x !== '-').join(' - ') || 'Standar', direction: 'in', reason: 'stok_awal', qty: +v.stock_qty || 0, note: 'Stok awal saat tambah produk' })
           }
         }
       }
-      toast.success(editing ? 'Produk diperbarui' : 'Produk ditambahkan')
+      toast.success(editing ? 'Produk diperbarui' : 'Produk ditambahkan — masukkan stoknya lewat Stok Masuk/Keluar')
       setShowForm(false); setEditing(null); setOrig(null)
       setFd(emptyForm()); setPhotoFile(null); setPhotoPreview('')
       load()
@@ -249,7 +257,7 @@ export default function MasterBarang() {
       <PageHeader subtitle="Kelola produk, varian, kategori & stok" actions={actions} />
       <div className="mb-4 relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cari nama / brand / kategori..." className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0058A3] outline-none" />
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cari nama / brand / kategori / mitra..." className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0058A3] outline-none" />
       </div>
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editing ? 'Edit Produk' : 'Tambah Produk Baru'} maxWidth="max-w-3xl"
@@ -281,7 +289,9 @@ export default function MasterBarang() {
                   <select value={fd.type} onChange={e => setFd({ ...fd, type: e.target.value })} className="w-full px-4 py-2.5 border rounded-lg bg-white">
                     <option value="new">Baru</option>
                     <option value="second">Second</option>
+                    <option value="consignment" disabled>Konsinyasi (otomatis dari titipan)</option>
                   </select>
+                  <p className="text-[11px] text-gray-400 mt-1">Tanda TITIPAN aktif otomatis saat barang titipan masuk lewat Stok Masuk/Keluar</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Brand</label>
@@ -318,6 +328,9 @@ export default function MasterBarang() {
               <h4 className="font-semibold text-gray-900">Varian {fd.stock_type === 'imei' ? '(setiap varian = daftar IMEI unit)' : '(stok per varian)'}</h4>
               <button type="button" onClick={addVariant} className="text-sm text-[#0058A3] font-medium flex items-center gap-1"><Plus className="w-4 h-4" />Tambah Varian</button>
             </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5 mb-3 text-xs text-gray-600">
+              Stok <b>tidak diisi di sini</b> — semua produk mulai dari 0. Masukkan stok lewat menu <b>Stok Masuk/Keluar</b> (pilih alasan Pembelian, atau <b>Barang Konsinyasi</b> untuk barang titipan mitra).
+            </div>
             <div className="space-y-3">
               {fd.variants.map((v, idx) => (
                 <div key={idx} className="border border-gray-200 rounded-lg p-3 bg-gray-50/50">
@@ -334,19 +347,13 @@ export default function MasterBarang() {
                     </div>
                     <div>
                       <RupiahInput value={v.hpp} onChange={x => setVariant(idx, 'hpp', x)} className="w-full px-3 py-2 border rounded-lg text-sm text-right outline-none focus:ring-2 focus:ring-[#0058A3]" placeholder="HPP" />
-                      <span className="text-[10px] text-gray-400">HPP / Modal</span>
+                      <span className="text-[10px] text-gray-400">HPP / Modal (isi harga titipan bila konsinyasi)</span>
                     </div>
-                    {fd.stock_type === 'qty' && !editing && (
-                      <div className="col-span-2 md:col-span-1">
-                        <input type="number" value={v.stock_qty} onChange={e => setVariant(idx, 'stock_qty', e.target.value)} placeholder="0" className="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#0058A3]" />
-                        <span className="text-[10px] text-gray-400">Stok Awal (tercatat sbg mutasi)</span>
-                      </div>
-                    )}
                   </div>
                   {fd.stock_type === 'imei' && (
                     <div className="mt-2">
                       <textarea value={v.imeis} onChange={e => setVariant(idx, 'imeis', e.target.value)} rows={2} placeholder={'Satu IMEI per baris:\n356789012345671'} className="w-full px-3 py-2 border rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-[#0058A3]" />
-                      <span className="text-[10px] text-gray-400">Hanya unit TERSEDIA. Unit TERJUAL dipertahankan saat simpan.</span>
+                      <span className="text-[10px] text-gray-400">Hanya unit TERSEDIA. Untuk barang TITIPAN, tambahkan IMEI lewat Stok Masuk/Keluar (alasan: Konsinyasi) agar hutang mitra tercatat.</span>
                     </div>
                   )}
                 </div>
@@ -446,11 +453,14 @@ export default function MasterBarang() {
                         : <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center text-gray-300"><ImageIcon className="w-6 h-6" /></div>}
                     </td>
                     <td className="p-3">
-                      <p className="text-sm font-medium text-gray-900">{r.name}</p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="text-sm font-medium text-gray-900">{r.name}</p>
+                        {r.consMitra && <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-bold whitespace-nowrap">TITIPAN · {r.consMitra}</span>}
+                      </div>
                       <p className="text-xs text-gray-500">{[r.brand, r.model].filter(Boolean).join(' ') || '—'}</p>
                     </td>
                     <td className="p-3"><span className="px-2 py-0.5 rounded text-xs bg-gray-100">{r.category}</span></td>
-                    <td className="p-3"><span className={`px-2 py-0.5 rounded text-xs font-medium ${r.type === 'second' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{r.type.toUpperCase()}</span></td>
+                    <td className="p-3"><span className={`px-2 py-0.5 rounded text-xs font-medium ${r.type === 'consignment' ? 'bg-amber-100 text-amber-700' : r.type === 'second' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{r.type === 'consignment' ? 'TITIPAN' : r.type.toUpperCase()}</span></td>
                     <td className="p-3 text-sm text-gray-600">{r.varCount} varian</td>
                     <td className="p-3 text-sm font-semibold text-[#0058A3]">{rp(r.harga)}</td>
                     <td className="p-3 text-sm"><span className={r.stok <= 5 ? 'text-red-600 font-semibold' : 'text-gray-700'}>{r.stok} {r.stock_type === 'imei' ? 'unit' : 'pcs'}</span></td>
