@@ -41,7 +41,7 @@ export default function Header({ user, role, title, showDateFilter = false }) {
   }
   const today = () => { const t = format(new Date(),'yyyy-MM-dd'); setFrom(t); setTo(t) }
   return (
-    <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm flex-shrink-0">
+    <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm flex-shrink-0">
       <div><h1 className="text-2xl font-bold text-gray-900">{title}</h1>{showDateFilter && <p className="text-sm text-gray-500 mt-0.5">{greeting}, <span className="font-semibold text-[#0058A3]">{user?.username||user?.email?.split('@')[0]}</span>!</p>}</div>
       <div className="flex items-center gap-3">
         {showDateFilter && (<div className="flex items-center gap-2 bg-gray-50 rounded-lg p-1 border border-gray-200">
