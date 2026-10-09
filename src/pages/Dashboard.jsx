@@ -3,23 +3,24 @@ import { supabase } from '../lib/supabaseClient'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { format, subDays, startOfDay } from 'date-fns'
 import { id } from 'date-fns/locale'
-import { DollarSign, Package, TrendingUp, ShoppingCart, Layers, AlertTriangle, Archive, Wallet, Repeat } from 'lucide-react'
+import { DollarSign, Package, TrendingUp, ShoppingCart, Layers, AlertTriangle, Archive, Wallet, Users } from 'lucide-react'
 const rp = n => new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(n||0)
 const vlabel = v => [v.color,v.storage].filter(x=>x&&x!=='-').join(' - ') || 'Standar'
 export default function Dashboard() {
-  const [s,setS]=useState({sales:0,hpp:0,profit:0,tx:0,totalTx:0,totalProd:0,totalStock:0,low:0,consignment:0})
+  const [s,setS]=useState({sales:0,hpp:0,profit:0,tx:0,totalTx:0,totalProd:0,totalStock:0,low:0,hutang:0})
   const [chart,setChart]=useState([]); const [lowList,setLowList]=useState([]); const [load,setLoad]=useState(true)
   useEffect(()=>{ run() },[])
   async function run(){
     const today=new Date()
-    // FIX: 1 query untuk 7 hari (sebelumnya 7 query beruntun), lalu dikelompokkan di client
-    const [txWeek,allTx,prods,vars,imeis,cons]=await Promise.all([
+    // 1 query utk grafik 7 hari, lalu dikelompokkan di client
+    const [txWeek,allTx,prods,vars,imeis,mv,pays]=await Promise.all([
       supabase.from('transactions').select('total_amount, created_at, transaction_items(hpp_at_sale,qty)').gte('created_at',startOfDay(subDays(today,6)).toISOString()).eq('payment_status','paid'),
       supabase.from('transactions').select('id',{count:'exact',head:true}).eq('payment_status','paid'),
       supabase.from('products').select('id,name,category,stock_type,status').eq('status','active'),
       supabase.from('product_variants').select('id,product_id,storage,color,stock_qty'),
       supabase.from('product_imeis').select('variant_id,status'),
-      supabase.from('consignment_settlements').select('store_share').not('owner_share','is',null)
+      supabase.from('stock_movements').select('direction,reason,qty,unit_value').not('mitra_id','is',null),
+      supabase.from('consignment_payments').select('amount')
     ])
     const todayKey=format(today,'yyyy-MM-dd'); const byDay={}
     let sales=0,hpp=0,txToday=0
@@ -36,8 +37,11 @@ export default function Dashboard() {
       if(st==='imei'){ const a=avByVar[v.id]||0; stock+=a; if(a===0) low.push({ name:nameMap[v.product_id], cat:catMap[v.product_id], label:vlabel(v), sisa:0, kind:'Habis' }) }
       else { const qq=+v.stock_qty||0; stock+=qq; if(qq<=5) low.push({ name:nameMap[v.product_id], cat:catMap[v.product_id], label:vlabel(v), sisa:qq, kind:'Menipis' }) }
     })
-    const consShare=(cons.data||[]).reduce((a,c)=>a+(+c.store_share||0),0)
-    setS({sales,hpp,profit:sales-hpp,tx:txToday,totalTx:allTx.count||0,totalProd:(prods.data||[]).length,totalStock:stock,low:low.length,consignment:consShare})
+    // HUTANG KONSINYASI (sama dengan halaman Keuntungan & Modal)
+    let hutang=0; (mv.data||[]).forEach(m=>{ const v=(+m.qty||0)*(+m.unit_value||0); if(m.direction==='in'&&m.reason==='konsinyasi') hutang+=v; else if(m.direction==='out'&&m.reason==='konsinyasi_retur') hutang-=v })
+    hutang-=(pays.data||[]).reduce((a,p)=>a+(+p.amount||0),0)
+    hutang=Math.max(0,hutang)
+    setS({sales,hpp,profit:sales-hpp,tx:txToday,totalTx:allTx.count||0,totalProd:(prods.data||[]).length,totalStock:stock,low:low.length,hutang})
     setChart(ch); setLowList(low.sort((a,b)=>a.sisa-b.sisa)); setLoad(false)
   }
   const Card=({icon:I,label,value,delay,sub})=>(<div className={`bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all animate-fade-in ${delay}`}><div className="p-2.5 rounded-lg bg-blue-50 w-fit mb-4"><I className="w-5 h-5 text-[#0058A3]"/></div><p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1.5">{label}</p><p className="text-2xl font-bold text-gray-900">{value}</p>{sub&&<p className="text-[11px] text-gray-400 mt-1">{sub}</p>}</div>)
@@ -54,7 +58,7 @@ export default function Dashboard() {
         <Card icon={Layers} label="Total Transaksi" value={s.totalTx} delay="stagger-5"/>
         <Card icon={Archive} label="Total Produk Aktif" value={s.totalProd} delay="stagger-6"/>
         <Card icon={Wallet} label="Total Stok (unit/pcs)" value={s.totalStock} delay="stagger-7"/>
-        <Card icon={Repeat} label="Bagi Hasil Konsinyasi (toko)" value={rp(s.consignment)} delay="stagger-8" sub="akumulasi share toko"/>
+        <Card icon={Users} label="Hutang Konsinyasi" value={rp(s.hutang)} delay="stagger-8" sub="belum dibayar ke mitra"/>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
@@ -68,6 +72,6 @@ export default function Dashboard() {
           <div className="space-y-1 max-h-[320px] overflow-y-auto">{lowList.map((p,i)=>(<div key={i} className="flex justify-between items-center py-3 px-2 hover:bg-gray-50 rounded"><div className="min-w-0"><p className="text-sm font-medium truncate">{p.name}</p><p className="text-xs text-gray-500">{p.cat} · {p.label}</p></div><span className={`text-sm font-bold px-2.5 py-1 rounded ${p.kind==='Habis'?'text-red-600 bg-red-50':'text-[#0058A3] bg-blue-50'}`}>{p.sisa} {p.kind}</span></div>))}</div>}
         </div>
       </div>
-      <p className="text-center text-xs text-gray-400">Design & Develop By <span className="font-semibold text-gray-600">Depgo</span></p>
+      <p className="text-center text-xs text-gray-400">Design & Develop By <span className="font-semibold text-gray-600">Fancell Team</span></p>
     </div> )
 }
