@@ -5,7 +5,7 @@ import PageHeader from '../components/PageHeader'
 import { Confirm, Modal, RupiahInput, useToast, rp } from '../components/ui'
 import {
   Plus, Edit2, Trash2, Check, Package, Search,
-  Upload, ImageIcon, Percent, Tags
+  Upload, ImageIcon, Percent, Tags, Boxes
 } from 'lucide-react'
 
 const emptyVariant = () => ({ id: null, storage: '', color: '', harga_jual: 0, hpp: 0, stock_qty: 0, imeis: '' })
@@ -14,6 +14,7 @@ const emptyForm = () => ({
   brand: '', model: '', status: 'active', image_url: '',
   variants: [emptyVariant()]
 })
+const vlabel = v => [v.color, v.storage].filter(x => x && x !== '-').join(' - ') || 'Standar'
 
 export default function MasterBarang() {
   const toast = useToast()
@@ -33,6 +34,7 @@ export default function MasterBarang() {
   const [showHpp, setShowHpp] = useState(false)
   const [hppPct, setHppPct] = useState(90)
   const [hppRows, setHppRows] = useState([])
+  const [showVal, setShowVal] = useState(false)
   const [cf, setCf] = useState(null)
   const ask = (message, action) => setCf({ message, action })
 
@@ -53,13 +55,11 @@ export default function MasterBarang() {
     ;(i.data || []).forEach(x => { if (x.status === 'available') avByVar[x.variant_id] = (avByVar[x.variant_id] || 0) + 1 })
     ;(p.data || []).forEach(x => pmap[x.id] = x)
     const ptmap = {}; (pts.data || []).forEach(x => ptmap[x.id] = x.name)
-    // peta produk -> nama mitra titipan (dideteksi dari mutasi konsinyasi)
     const consByProduct = {}
     ;(consMoves.data || []).forEach(m => { const pid = vmap[m.variant_id]; const nm = ptmap[m.mitra_id]; if (pid && nm) { (consByProduct[pid] = consByProduct[pid] || new Set()).add(nm) } })
-    // sinkronkan tipe produk utk badge TITIPAN di POS (diam-diam, sekali saja)
     const needFix = (p.data || []).filter(x => consByProduct[x.id] && x.type !== 'consignment')
     if (needFix.length) supabase.from('products').update({ type: 'consignment' }).in('id', needFix.map(x => x.id)).then(() => {}, () => {})
-    setAllVariants(flat.map(x => ({ ...x, pname: pmap[x.product_id]?.name || '—' })))
+    setAllVariants(flat.map(x => ({ ...x, pname: pmap[x.product_id]?.name || '—', stock_type: pmap[x.product_id]?.stock_type || 'qty', avail: avByVar[x.id] || 0 })))
     setRows((p.data || []).map(prod => {
       const vs = byProd[prod.id] || []
       const stok = prod.stock_type === 'imei'
@@ -78,6 +78,24 @@ export default function MasterBarang() {
     r.category?.toLowerCase().includes(q.toLowerCase()) ||
     r.consMitra?.toLowerCase().includes(q.toLowerCase())
   )
+
+  // REKAP TOTAL MODAL BARANG (utk popup): per produk → varian → qty × HPP
+  function buildValRows() {
+    const out = []; let total = 0
+    rows.forEach(r => {
+      const items = allVariants.filter(v => v.product_id === r.id).map(v => {
+        const qty = r.stock_type === 'imei' ? (v.avail || 0) : (+v.stock_qty || 0)
+        const hpp = +v.hpp || 0
+        return { label: vlabel(v), qty, hpp, nilai: qty * hpp }
+      })
+      const sub = items.reduce((a, i) => a + i.nilai, 0); total += sub
+      const hppKosong = items.some(i => i.qty > 0 && i.hpp === 0)
+      out.push({ kind: 'g', id: r.id, name: r.name, consMitra: r.consMitra, sub, hppKosong })
+      items.forEach((it, i) => out.push({ kind: 'i', id: r.id + '-' + i, ...it }))
+    })
+    return { out, total }
+  }
+  const valData = buildValRows()
 
   function pickPhoto(e) {
     const f = e.target.files?.[0]
@@ -240,6 +258,9 @@ export default function MasterBarang() {
 
   const actions = (
     <>
+      <button onClick={() => setShowVal(true)} className="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium">
+        <Boxes className="w-4 h-4" />Total Modal
+      </button>
       <button onClick={() => setShowCat(true)} className="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium">
         <Tags className="w-4 h-4" />Kategori
       </button>
@@ -259,6 +280,38 @@ export default function MasterBarang() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cari nama / brand / kategori / mitra..." className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0058A3] outline-none" />
       </div>
+
+      {/* POPUP TOTAL MODAL BARANG */}
+      <Modal open={showVal} onClose={() => setShowVal(false)} title="Total Modal Barang (Stok × HPP)" maxWidth="max-w-3xl">
+        <div className="space-y-3">
+          <p className="text-sm text-gray-500">Rekap modal yang tertanam di setiap barang. HPP Rp 0 + qty &gt; 0 berarti HPP varian belum diisi.</p>
+          <div className="border rounded-lg overflow-hidden">
+            <div className="max-h-[55vh] overflow-y-auto">
+              <table className="w-full">
+                <thead className="sticky top-0"><tr className="bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase"><th className="text-left p-2.5">Produk / Varian</th><th className="text-right p-2.5">Qty</th><th className="text-right p-2.5">HPP</th><th className="text-right p-2.5">Nilai</th></tr></thead>
+                <tbody className="divide-y">
+                  {valData.out.map(r => r.kind === 'g' ? (
+                    <tr key={r.id} className="bg-blue-50/70">
+                      <td className="p-2.5 text-sm font-bold text-gray-900" colSpan={3}>{r.name}{r.consMitra && <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-bold align-middle">TITIPAN · {r.consMitra}</span>}{r.hppKosong && <span className="ml-2 text-[10px] text-red-500 font-semibold align-middle">⚠ HPP belum diisi!</span>}</td>
+                      <td className="p-2.5 text-sm text-right font-bold text-[#0058A3]">{rp(r.sub)}</td>
+                    </tr>
+                  ) : (
+                    <tr key={r.id} className="hover:bg-gray-50">
+                      <td className="p-2.5 text-sm text-gray-600 pl-6">{r.label}</td>
+                      <td className="p-2.5 text-sm text-right">{r.qty}</td>
+                      <td className={`p-2.5 text-sm text-right ${r.hpp === 0 ? 'text-red-400' : 'text-gray-600'}`}>{rp(r.hpp)}</td>
+                      <td className="p-2.5 text-sm text-right font-medium">{rp(r.nilai)}</td>
+                    </tr>
+                  ))}
+                  {!valData.out.length && <tr><td colSpan={4} className="p-8 text-center text-gray-400 text-sm">Belum ada produk</td></tr>}
+                </tbody>
+                <tfoot><tr className="bg-[#0058A3] text-white"><td className="p-3 font-bold" colSpan={3}>TOTAL MODAL BARANG</td><td className="p-3 text-right font-bold text-base">{rp(valData.total)}</td></tr></tfoot>
+              </table>
+            </div>
+          </div>
+          <p className="text-[11px] text-gray-400">Angka ini sama dengan kartu "Nilai Stok di Rak" di halaman Keuntungan & Modal. Barang titipan ikut terhitung di sini (HPP-nya = harga titipan) dan berbanding lurus dengan Hutang Titipan.</p>
+        </div>
+      </Modal>
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editing ? 'Edit Produk' : 'Tambah Produk Baru'} maxWidth="max-w-3xl"
         footer={
