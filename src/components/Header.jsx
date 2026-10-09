@@ -16,8 +16,6 @@ const timeAgo = d => {
 }
 export default function Header({ user, role, title, showDateFilter = false, dateFrom, dateTo, setDateFrom, setDateTo }) {
   const [greeting, setGreeting] = useState('')
-  const [from, setFrom] = useState(format(new Date(),'yyyy-MM-dd'))
-  const [to, setTo] = useState(format(new Date(),'yyyy-MM-dd'))
   const [alerts, setAlerts] = useState([]); const [acts, setActs] = useState([]); const [bellOpen, setBellOpen] = useState(false)
   const bellRef = useRef(null)
   useEffect(() => { const h = new Date().getHours(); setGreeting(h<11?'Selamat Pagi':h<15?'Selamat Siang':h<18?'Selamat Sore':'Selamat Malam') }, [])
@@ -39,15 +37,15 @@ export default function Header({ user, role, title, showDateFilter = false, date
       setActs(moves.data || [])
     } catch { setAlerts([]); setActs([]) }
   }
-  const today = () => { const t = format(new Date(),'yyyy-MM-dd'); setFrom(t); setTo(t) }
+  const today = () => { const t = format(new Date(),'yyyy-MM-dd'); setDateFrom?.(t); setDateTo?.(t) }
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm flex-shrink-0">
       <div><h1 className="text-2xl font-bold text-gray-900">{title}</h1>{showDateFilter && <p className="text-sm text-gray-500 mt-0.5">{greeting}, <span className="font-semibold text-[#0058A3]">{user?.username||user?.email?.split('@')[0]}</span>!</p>}</div>
       <div className="flex items-center gap-3">
         {showDateFilter && (<div className="flex items-center gap-2 bg-gray-50 rounded-lg p-1 border border-gray-200">
-          <div className="flex items-center gap-2 px-3"><span className="text-xs text-gray-500 font-medium">Dari</span><input type="date" value={from} onChange={e=>setFrom(e.target.value)} className="text-sm bg-transparent outline-none text-gray-700"/></div>
+          <div className="flex items-center gap-2 px-3"><span className="text-xs text-gray-500 font-medium">Dari</span><input type="date" value={dateFrom} onChange={e=>setDateFrom?.(e.target.value)} className="text-sm bg-transparent outline-none text-gray-700"/></div>
           <div className="w-px h-6 bg-gray-300"></div>
-          <div className="flex items-center gap-2 px-3"><span className="text-xs text-gray-500 font-medium">Sampai</span><input type="date" value={to} onChange={e=>setTo(e.target.value)} className="text-sm bg-transparent outline-none text-gray-700"/></div>
+          <div className="flex items-center gap-2 px-3"><span className="text-xs text-gray-500 font-medium">Sampai</span><input type="date" value={dateTo} onChange={e=>setDateTo?.(e.target.value)} className="text-sm bg-transparent outline-none text-gray-700"/></div>
           <button onClick={today} className="px-3 py-1.5 bg-white border border-gray-200 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-100">Hari Ini</button>
         </div>)}
         <div className="relative" ref={bellRef}>
@@ -57,7 +55,6 @@ export default function Header({ user, role, title, showDateFilter = false, date
           </button>
           {bellOpen && (
             <div className="absolute right-0 top-full mt-2 w-96 max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden animate-fade-in">
-              {/* BAGIAN 1: PERLU PERHATIAN */}
               <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-red-50/50">
                 <p className="text-sm font-bold text-gray-900 flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-red-500"/>Perlu Perhatian</p>
                 <span className="text-xs text-gray-400">{alerts.length ? alerts.length + ' stok habis' : 'stok aman ✓'}</span>
@@ -71,7 +68,6 @@ export default function Header({ user, role, title, showDateFilter = false, date
                 )) : <p className="px-4 py-3 text-sm text-gray-400">✓ Semua stok aman</p>}
                 {alerts.length > 5 && <p className="px-4 py-2 text-xs text-gray-400 text-center">+{alerts.length - 5} lainnya</p>}
               </div>
-              {/* BAGIAN 2: AKTIVITAS TERBARU */}
               <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-blue-50/50">
                 <p className="text-sm font-bold text-gray-900">Aktivitas Terbaru</p>
                 <span className="text-xs text-gray-400">{acts.length ? acts.length + ' aktivitas' : 'kosong'}</span>
