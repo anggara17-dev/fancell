@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { format } from 'date-fns'
 import { ToastProvider } from './components/ui'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { useStoreSettings } from './lib/useStoreSettings'
@@ -33,6 +34,9 @@ function FaviconSync() {
 function MainApp() {
   const { user, role } = useAuth()
   const [page, setPage] = useState('dashboard')
+  // FIX: state filter tanggal dashboard dipindah ke sini agar bisa dipakai Header (UI) + Dashboard (hitungan)
+  const [dashFrom, setDashFrom] = useState(format(new Date(), 'yyyy-MM-dd'))
+  const [dashTo, setDashTo] = useState(format(new Date(), 'yyyy-MM-dd'))
   if (!user) return <Login />
   const titles = {
     dashboard: 'Dashboard',
@@ -50,7 +54,7 @@ function MainApp() {
   }
   const render = () => {
     switch (page) {
-      case 'dashboard': return <Dashboard />
+      case 'dashboard': return <Dashboard from={dashFrom} to={dashTo} />
       case 'kasir': return <POSKasir />
       case 'metode-bayar': return <MetodeBayar />
       case 'cetak': return <CetakPrinter />
@@ -69,7 +73,7 @@ function MainApp() {
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       <Sidebar currentPage={page} setCurrentPage={setPage} />
       <div className="flex-1 flex flex-col min-w-0 h-full">
-        <Header user={user} role={role} title={titles[page] || 'Dashboard'} showDateFilter={page === 'dashboard'} />
+        <Header user={user} role={role} title={titles[page] || 'Dashboard'} showDateFilter={page === 'dashboard'} dateFrom={dashFrom} dateTo={dashTo} setDateFrom={setDashFrom} setDateTo={setDashTo} />
         <main className="flex-1 overflow-y-auto">{render()}</main>
       </div>
     </div>
