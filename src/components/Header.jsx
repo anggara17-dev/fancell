@@ -14,7 +14,7 @@ const timeAgo = d => {
   if (diff < 86400) return Math.floor(diff / 3600) + ' jam lalu'
   return format(new Date(d), 'dd MMM HH:mm')
 }
-export default function Header({ user, role, title, showDateFilter = false }) {
+export default function Header({ user, role, title, showDateFilter = false, dateFrom, dateTo, setDateFrom, setDateTo }) {
   const [greeting, setGreeting] = useState('')
   const [from, setFrom] = useState(format(new Date(),'yyyy-MM-dd'))
   const [to, setTo] = useState(format(new Date(),'yyyy-MM-dd'))
